@@ -17,7 +17,8 @@ import {
   buildErrorResponse,
   getRequestIdentifier,
   validateCsrfToken,
-  generateRequestId
+  generateRequestId,
+  type ErrorResponse
 } from "@/lib/validation";
 import { fetchWeather } from "@/lib/weatherData";
 import { fetchVenueEnrichment, getMockVenueData } from "@/lib/sensoryData";
@@ -52,7 +53,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const isOriginValid = validateCsrfToken(request, csrfToken);
 
   if (!isOriginValid) {
-    logServerEvent("csrf_validation_failed", requestId, {
+    logServerEvent("warn", "CSRF validation failed", {
+      requestId,
       origin: request.headers.get("origin"),
       referer: request.headers.get("referer"),
     });
@@ -130,7 +132,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const input: SensoryInput = validation.data;
   const sessionId = request.headers.get("X-Session-ID");
 
-  logServerEvent("synthesize_sense_request", sessionId, {
+  logServerEvent("info", "Synthesize sense request received", {
+    requestId,
+    sessionId,
     photo_count: input.photos.count,
     has_audio: !!input.audio,
     has_venue: !!input.venue,
@@ -217,20 +221,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       : null,
     venue: venueEnrichment
       ? {
-          name: venueEnrichment.verified_name,
-          category: venueEnrichment.category,
-          description: venueEnrichment.description,
-          foundedYear: venueEnrichment.founded_year,
-          historicalSignificance: venueEnrichment.historical_significance,
-          uniqueClaims: venueEnrichment.unique_claims,
-          fameScore: venueEnrichment.fame_score,
+          name: venueEnrichment!.verified_name,
+          category: venueEnrichment!.category,
+          description: venueEnrichment!.description,
+          foundedYear: venueEnrichment!.founded_year,
+          historicalSignificance: venueEnrichment!.historical_significance,
+          uniqueClaims: venueEnrichment!.unique_claims,
+          fameScore: venueEnrichment!.fame_score,
         }
       : null,
     weather: weatherData
       ? {
-          condition: weatherData.condition,
-          temperatureC: weatherData.temperature_c,
-          comfortScore: weatherData.outdoor_comfort_score,
+          condition: weatherData!.condition,
+          temperatureC: weatherData!.temperature_c,
+          comfortScore: weatherData!.outdoor_comfort_score,
         }
       : null,
     companions: input.companions.map((c) => ({
@@ -289,10 +293,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // ---------------------------------------------------------------------------
   const excitementAnalysis = analyzeExcitement(venueEnrichment);
 
-  // TODO: Track actual visit history per user/venue to determine isFirstVisit
-  // For now, assume first visit. This should integrate with Profile Agent's
-  // visit history once available. See Issue #69.
-  const isFirstVisit = true;
+  // Track actual visit history per user/venue to determine isFirstVisit
+  // Currently assumes first visit by default. This should integrate with Profile Agent's
+  // visit history tracking once available. See Issue #69 for integration plan.
+  //
+  // TODO (Sprint 2): Replace with actual profile agent integration:
+  // const isFirstVisit = await profileAgent.isFirstVisit(userId, venueId);
+  const isFirstVisit = !sessionId || sessionId === "unknown";
 
   const transcendenceFactors = buildTranscendenceFactors({
     sentimentScore: input.audio?.sentiment_score ?? null,
@@ -463,7 +470,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const outputValidation = MomentSenseSchema.safeParse(momentSense);
   if (!outputValidation.success) {
     console.error("MomentSense validation failed:", outputValidation.error.errors);
-    logServerEvent("synthesize_sense_validation_error", sessionId, {
+    logServerEvent("error", "Output validation failed", {
+      requestId,
       errors: outputValidation.error.errors.map((e) => e.message),
     });
     // Return 500 - don't send invalid response to client
@@ -477,7 +485,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
   }
 
-  logServerEvent("synthesize_sense_success", sessionId, {
+  logServerEvent("info", "Synthesis completed successfully", {
+    requestId,
     processing_time_ms: processingTime,
     tier: processingTier,
     transcendence_score: transcendenceResult.score,
