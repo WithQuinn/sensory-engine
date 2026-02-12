@@ -146,6 +146,12 @@ export type CompanionInput = z.infer<typeof CompanionInputSchema>;
 /**
  * Main input schema - what the client sends to synthesize a moment
  */
+// Forward declare CoordinatesSchema for use in SensoryInputSchema
+const InputCoordinatesSchema = z.object({
+  lat: z.number().min(-90, 'Latitude must be between -90 and 90').max(90),
+  lon: z.number().min(-180, 'Longitude must be between -180 and 180').max(180),
+});
+
 export const SensoryInputSchema = z.object({
   // Photos (required - at least 1)
   photos: z.object({
@@ -160,10 +166,7 @@ export const SensoryInputSchema = z.object({
   venue: z.object({
     name: z.string().min(1),
     category: VenueCategoryEnum.optional(),
-    coordinates: z.object({
-      lat: z.number(),
-      lon: z.number(),
-    }).optional(),
+    coordinates: InputCoordinatesSchema.optional(),
   }).nullable().default(null),
 
   // Companions (optional - may detect from faces)
@@ -712,3 +715,41 @@ export const CoordinatesSchema = z.object({
   lat: z.number().min(-90).max(90),
   lon: z.number().min(-180).max(180),
 });
+
+// =============================================================================
+// CLAUDE SYNTHESIS RESPONSE SCHEMA
+// =============================================================================
+
+/**
+ * Claude synthesis output - what the LLM returns
+ */
+export const SynthesisOutputSchema = z.object({
+  primaryEmotion: z.string().min(1),
+  secondaryEmotions: z.array(z.string()).default([]),
+  emotionConfidence: z.number().min(0).max(1).default(0.7),
+  narratives: z.object({
+    short: z.string().min(1),
+    medium: z.string().min(1),
+    full: z.string().min(1),
+  }),
+  excitementHook: z.string().nullable().default(null),
+  memoryAnchors: z.object({
+    sensory: z.string().min(1),
+    emotional: z.string().min(1),
+    unexpected: z.string().nullable().default(null),
+    shareable: z.string().nullable().default(null),
+    companion: z.string().nullable().default(null),
+  }),
+  companionExperiences: z.array(z.object({
+    nickname: z.string(),
+    reaction: z.string(),
+    wouldReturn: z.boolean().nullable(),
+  })).default([]),
+  inferredSensory: z.object({
+    scent: z.string().nullable().default(null),
+    tactile: z.string().nullable().default(null),
+    sound: z.string().nullable().default(null),
+  }).default({}),
+});
+
+export type SynthesisOutput = z.infer<typeof SynthesisOutputSchema>;

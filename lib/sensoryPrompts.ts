@@ -6,6 +6,7 @@
 // =============================================================================
 
 import type { LocalAnalysisResult, CloudEnrichment, VenueCategory } from './sensoryValidation';
+import { SynthesisOutputSchema } from './sensoryValidation';
 
 // =============================================================================
 // PROMPT TYPES
@@ -357,6 +358,7 @@ export function buildSynthesisInputFromAnalysis(
 
 /**
  * Parse Claude's synthesis response into structured output
+ * Validates response against SynthesisOutputSchema
  */
 export function parseSynthesisResponse(response: string): SynthesisOutput | null {
   try {
@@ -370,38 +372,18 @@ export function parseSynthesisResponse(response: string): SynthesisOutput | null
 
     const parsed = JSON.parse(jsonStr);
 
-    // Validate required fields
-    if (!parsed.primaryEmotion || !parsed.narratives || !parsed.memoryAnchors) {
-      console.error('Missing required fields in synthesis response');
+    // Validate against schema
+    const validated = SynthesisOutputSchema.safeParse(parsed);
+
+    if (!validated.success) {
+      console.error('Synthesis response validation failed:', validated.error.errors);
       return null;
     }
 
-    return {
-      primaryEmotion: parsed.primaryEmotion,
-      secondaryEmotions: parsed.secondaryEmotions || [],
-      emotionConfidence: parsed.emotionConfidence || 0.7,
-      narratives: {
-        short: parsed.narratives.short || '',
-        medium: parsed.narratives.medium || '',
-        full: parsed.narratives.full || '',
-      },
-      excitementHook: parsed.excitementHook || null,
-      memoryAnchors: {
-        sensory: parsed.memoryAnchors.sensory || '',
-        emotional: parsed.memoryAnchors.emotional || '',
-        unexpected: parsed.memoryAnchors.unexpected || null,
-        shareable: parsed.memoryAnchors.shareable || null,
-        companion: parsed.memoryAnchors.companion || null,
-      },
-      companionExperiences: parsed.companionExperiences || [],
-      inferredSensory: {
-        scent: parsed.inferredSensory?.scent || null,
-        tactile: parsed.inferredSensory?.tactile || null,
-        sound: parsed.inferredSensory?.sound || null,
-      },
-    };
+    return validated.data;
   } catch (error) {
-    console.error('Failed to parse synthesis response:', error);
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error('Failed to parse synthesis response:', errorMsg);
     return null;
   }
 }
