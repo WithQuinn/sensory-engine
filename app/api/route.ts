@@ -13,7 +13,12 @@ import {
   type Setting,
   type CrowdFeel,
 } from "@/lib/sensoryValidation";
-import { ErrorResponse } from "@/lib/validation";
+import {
+  buildErrorResponse,
+  getRequestIdentifier,
+  validateCsrfToken,
+  generateRequestId
+} from "@/lib/validation";
 import { fetchWeather } from "@/lib/weatherData";
 import { fetchVenueEnrichment, getMockVenueData } from "@/lib/sensoryData";
 import {
@@ -38,22 +43,51 @@ import {
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const startTime = Date.now();
   const now = new Date().toISOString();
+  const requestId = generateRequestId();
+
+  // ---------------------------------------------------------------------------
+  // 0. CSRF Protection
+  // ---------------------------------------------------------------------------
+  const csrfToken = request.headers.get("X-CSRF-Token");
+  const isOriginValid = validateCsrfToken(request, csrfToken);
+
+  if (!isOriginValid) {
+    logServerEvent("csrf_validation_failed", requestId, {
+      origin: request.headers.get("origin"),
+      referer: request.headers.get("referer"),
+    });
+
+    return NextResponse.json(
+      buildErrorResponse(
+        "CSRF validation failed",
+        "CSRF_INVALID",
+        { requestId },
+        requestId
+      ),
+      { status: 403 }
+    );
+  }
 
   // ---------------------------------------------------------------------------
   // 1. Rate Limiting
   // ---------------------------------------------------------------------------
-  const rateLimitResult = await checkRateLimit(request);
-  const rateLimitHeaders = getRateLimitHeaders(rateLimitResult);
+  const identifier = getRequestIdentifier(request);
+  const allowed = checkRateLimit(identifier);
+  const rateLimitHeaders = getRateLimitHeaders(identifier);
 
-  if (!rateLimitResult.allowed) {
-    const errorResponse: ErrorResponse = {
-      success: false,
-      error: "Rate limit exceeded. Please try again later.",
-    };
-    return NextResponse.json(errorResponse, {
-      status: 429,
-      headers: rateLimitHeaders,
-    });
+  if (!allowed) {
+    return NextResponse.json(
+      buildErrorResponse(
+        "Rate limit exceeded. Please try again later.",
+        "RATE_LIMITED",
+        { requestId },
+        requestId
+      ),
+      {
+        status: 429,
+        headers: rateLimitHeaders,
+      }
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -63,26 +97,34 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     body = await request.json();
   } catch {
-    const errorResponse: ErrorResponse = {
-      success: false,
-      error: "Invalid JSON in request body",
-    };
-    return NextResponse.json(errorResponse, {
-      status: 400,
-      headers: rateLimitHeaders,
-    });
+    return NextResponse.json(
+      buildErrorResponse(
+        "Invalid JSON in request body",
+        "VALIDATION_ERROR",
+        { requestId },
+        requestId
+      ),
+      {
+        status: 400,
+        headers: rateLimitHeaders,
+      }
+    );
   }
 
   const validation = SensoryInputSchema.safeParse(body);
   if (!validation.success) {
-    const errorResponse: ErrorResponse = {
-      success: false,
-      error: validation.error.errors[0]?.message || "Invalid request",
-    };
-    return NextResponse.json(errorResponse, {
-      status: 400,
-      headers: rateLimitHeaders,
-    });
+    return NextResponse.json(
+      buildErrorResponse(
+        validation.error.errors[0]?.message || "Invalid request",
+        "VALIDATION_ERROR",
+        { errors: validation.error.errors, requestId },
+        requestId
+      ),
+      {
+        status: 400,
+        headers: rateLimitHeaders,
+      }
+    );
   }
 
   const input: SensoryInput = validation.data;
