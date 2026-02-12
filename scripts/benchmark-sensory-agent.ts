@@ -5,9 +5,8 @@
  */
 
 import { performance } from 'perf_hooks';
-import Anthropic from '@anthropic-ai/sdk';
-import { fetchWeather, coarsenCoordinates } from '@/lib/weatherData';
-import { fetchVenueEnrichment, getMockVenueData } from '@/lib/sensoryData';
+import { coarsenCoordinates } from '@/lib/weatherData';
+import { getMockVenueData } from '@/lib/sensoryData';
 import { buildSynthesisPrompt, parseSynthesisResponse } from '@/lib/sensoryPrompts';
 import { calculateTranscendenceScore } from '@/lib/excitementEngine';
 
@@ -34,7 +33,6 @@ function percentile(arr: number[], p: number): number {
 }
 
 function calculateStats(times: number[]): Omit<BenchmarkResult, 'name' | 'iterations'> {
-  const sorted = [...times].sort((a, b) => a - b);
   return {
     times,
     min: Math.min(...times),
@@ -109,10 +107,6 @@ async function benchmarkClaudeSynthesis(): Promise<BenchmarkResult> {
 
   console.log('\n⏱️  Benchmarking Claude Synthesis (Prompt Building + Parsing)...');
 
-  const anthropic = new Anthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY || 'test-key',
-  });
-
   for (let i = 0; i < iterations; i++) {
     const input = {
       photoAnalysis: {
@@ -158,14 +152,13 @@ async function benchmarkClaudeSynthesis(): Promise<BenchmarkResult> {
 
     const start = performance.now();
     // Measure prompt building + response parsing
-    const prompt = buildSynthesisPrompt(input);
+    buildSynthesisPrompt(input);
     const mockResponse = JSON.stringify({
       primaryEmotion: 'awe',
       narratives: { short: 'test', medium: 'test', full: 'test' },
       memoryAnchors: { sensory: 'test', emotional: 'test' },
     });
-    const parsed = parseSynthesisResponse(mockResponse);
-    void parsed; // Use to prevent optimization
+    void parseSynthesisResponse(mockResponse); // Measure parsing
     const end = performance.now();
 
     times.push(end - start);
@@ -279,13 +272,14 @@ function benchmarkExcitementEngine(): BenchmarkResult {
 
     // Calculate transcendence score
     const score = calculateTranscendenceScore({
-      venueFameScore: 0.85,
-      venueHistorical: true,
-      photoQuality: 0.8,
-      audioSentiment: 0.9,
-      weatherComfort: 0.7,
-      companionPresence: true,
-      isGoldenHour: true,
+      fame_score: 0.85,
+      emotion_intensity: 0.9,
+      atmosphere_quality: 0.8,
+      novelty_factor: 0.85,
+      weather_match: 0.7,
+      companion_engagement: 0.8,
+      intent_match: 0.9,
+      surprise_factor: 0.75,
     });
 
     void score; // Use to prevent optimization
@@ -321,15 +315,16 @@ async function benchmarkFullSynthesis(): Promise<BenchmarkResult> {
     // Simulate full synthesis flow
     const venue = getMockVenueData('Senso-ji Temple');
     const coarsened = coarsenCoordinates(35.7148, 139.7967);
-    const mockWeather = { condition: 'Clear', temperatureC: 21, comfortScore: 0.9 };
+    const mockWeather = { condition: 'Clear', temperature_c: 21, outdoor_comfort_score: 0.9 };
     const transcendence = calculateTranscendenceScore({
-      venueFameScore: venue.fame_score,
-      venueHistorical: true,
-      photoQuality: 0.8,
-      audioSentiment: 0.85,
-      weatherComfort: 0.9,
-      companionPresence: false,
-      isGoldenHour: true,
+      fame_score: venue.fame_score || 0.5,
+      emotion_intensity: 0.85,
+      atmosphere_quality: 0.8,
+      novelty_factor: 0.7,
+      weather_match: 0.9,
+      companion_engagement: 0.4,
+      intent_match: 0.85,
+      surprise_factor: 0.75,
     });
 
     void [venue, coarsened, mockWeather, transcendence];

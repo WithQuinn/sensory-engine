@@ -5,7 +5,7 @@
 // =============================================================================
 
 import { z } from 'zod';
-import { OpenWeatherResponseSchema, CoordinatesSchema } from './sensoryValidation';
+import { OpenWeatherResponseSchema } from './sensoryValidation';
 
 // =============================================================================
 // TYPES

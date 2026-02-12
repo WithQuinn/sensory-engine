@@ -47,25 +47,6 @@ interface WikiSearchResult {
   title: string;
 }
 
-interface WikiSearchResponse {
-  query?: {
-    search: WikiSearchResult[];
-  };
-}
-
-interface WikiPageResponse {
-  query?: {
-    pages: Record<string, {
-      pageid: number;
-      title: string;
-      extract?: string;
-      description?: string;
-      categories?: Array<{ title: string }>;
-      fullurl?: string;
-    }>;
-  };
-}
-
 // =============================================================================
 // FAME SCORE CALCULATION
 // =============================================================================
@@ -152,7 +133,7 @@ export function extractFoundedYear(text: string): number | null {
  * Extract unique claims from Wikipedia text
  * Looks for superlatives and notable facts
  */
-export function extractUniqueClaims(text: string, title: string): string[] {
+export function extractUniqueClaims(text: string, _title: string): string[] {
   const claims: string[] = [];
 
   const patterns = [

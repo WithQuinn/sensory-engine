@@ -20,8 +20,8 @@ import {
   generateRequestId,
   type ErrorResponse
 } from "@/lib/validation";
-import { fetchWeather } from "@/lib/weatherData";
-import { fetchVenueEnrichment, getMockVenueData } from "@/lib/sensoryData";
+import { fetchWeather, type WeatherData } from "@/lib/weatherData";
+import { fetchVenueEnrichment, getMockVenueData, type VenueEnrichment } from "@/lib/sensoryData";
 import {
   SENSORY_SYSTEM_PROMPT,
   buildSynthesisPrompt,
@@ -150,8 +150,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   let processingTier: ProcessingTier = "full";
   const servicesCalled: string[] = [];
 
-  let weatherData = null;
-  let venueEnrichment = null;
+  let weatherData: WeatherData | null = null;
+  let venueEnrichment: VenueEnrichment | null = null;
 
   // Build parallel requests for independent operations
   const parallelRequests: Promise<void>[] = [];
@@ -177,23 +177,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   // Venue enrichment (Wikipedia)
   if (input.venue?.name) {
+    const venueName = input.venue.name;
     parallelRequests.push(
-      fetchVenueEnrichment(input.venue.name)
+      fetchVenueEnrichment(venueName)
         .then((venueResult) => {
           if (venueResult.success && venueResult.data) {
             venueEnrichment = venueResult.data;
             servicesCalled.push("wikipedia");
           } else {
-            venueEnrichment = getMockVenueData(input.venue.name);
+            venueEnrichment = getMockVenueData(venueName);
             servicesCalled.push("mock_venue");
           }
         })
         .catch(() => {
           // Wikipedia failure - fall back to mock
-          if (input.venue?.name) {
-            venueEnrichment = getMockVenueData(input.venue.name);
-            servicesCalled.push("mock_venue");
-          }
+          venueEnrichment = getMockVenueData(venueName);
+          servicesCalled.push("mock_venue");
         })
     );
   }
@@ -219,22 +218,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           durationSeconds: input.audio.duration_seconds,
         }
       : null,
-    venue: venueEnrichment
-      ? {
-          name: venueEnrichment!.verified_name,
-          category: venueEnrichment!.category,
-          description: venueEnrichment!.description,
-          foundedYear: venueEnrichment!.founded_year,
-          historicalSignificance: venueEnrichment!.historical_significance,
-          uniqueClaims: venueEnrichment!.unique_claims,
-          fameScore: venueEnrichment!.fame_score,
-        }
-      : null,
+    venue:
+      venueEnrichment && input.venue
+        ? {
+            name: (venueEnrichment as VenueEnrichment).verified_name,
+            category: (venueEnrichment as VenueEnrichment).category,
+            description: (venueEnrichment as VenueEnrichment).description,
+            foundedYear: (venueEnrichment as VenueEnrichment).founded_year,
+            historicalSignificance: (venueEnrichment as VenueEnrichment).historical_significance,
+            uniqueClaims: (venueEnrichment as VenueEnrichment).unique_claims,
+            fameScore: (venueEnrichment as VenueEnrichment).fame_score,
+          }
+        : null,
     weather: weatherData
       ? {
-          condition: weatherData!.condition,
-          temperatureC: weatherData!.temperature_c,
-          comfortScore: weatherData!.outdoor_comfort_score,
+          condition: (weatherData as WeatherData).condition,
+          temperatureC: (weatherData as WeatherData).temperature_c,
+          comfortScore: (weatherData as WeatherData).outdoor_comfort_score,
         }
       : null,
     companions: input.companions.map((c) => ({
@@ -305,8 +305,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     sentimentScore: input.audio?.sentiment_score ?? null,
     atmosphereQuality: calculateAtmosphereQuality(photoAnalysis),
     isFirstVisit,
-    fameScore: venueEnrichment?.fame_score ?? null,
-    weatherComfort: weatherData?.outdoor_comfort_score ?? null,
+    fameScore: venueEnrichment ? (venueEnrichment as VenueEnrichment).fame_score : null,
+    weatherComfort: weatherData ? (weatherData as WeatherData).outdoor_comfort_score : null,
     companionCount: input.companions.length,
     intentMatch: null,
     hadUnexpectedMoment: false,
@@ -358,7 +358,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     moment_id: crypto.randomUUID(),
     timestamp: input.captured_at,
     venue_name: input.venue?.name || "Unknown Location",
-    venue_category: venueEnrichment?.category ?? null,
+    venue_category: venueEnrichment ? (venueEnrichment as VenueEnrichment).category : null,
 
     detection: {
       trigger: input.detection?.trigger || "manual",
@@ -397,10 +397,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     },
 
     excitement: {
-      fame_score: venueEnrichment?.fame_score ?? null,
+      fame_score: venueEnrichment ? (venueEnrichment as VenueEnrichment).fame_score : null,
       fame_signals: [],
       unique_claims: excitementAnalysis.uniqueFacts,
-      historical_significance: venueEnrichment?.historical_significance ?? null,
+      historical_significance: venueEnrichment ? (venueEnrichment as VenueEnrichment).historical_significance : null,
       excitement_hook: excitementAnalysis.excitementHook,
     },
 
@@ -437,9 +437,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     environment: {
       weather: weatherData
         ? {
-            condition: weatherData.condition,
-            temperature_c: weatherData.temperature_c,
-            outdoor_comfort_score: weatherData.outdoor_comfort_score,
+            condition: (weatherData as WeatherData).condition,
+            temperature_c: (weatherData as WeatherData).temperature_c,
+            outdoor_comfort_score: (weatherData as WeatherData).outdoor_comfort_score,
           }
         : null,
       timing: {
@@ -478,6 +478,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const errorResponse: ErrorResponse = {
       success: false,
       error: "Internal error: synthesis output validation failed",
+      code: "SYNTHESIS_FAILED",
+      requestId,
     };
     return NextResponse.json(errorResponse, {
       status: 500,

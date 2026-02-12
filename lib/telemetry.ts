@@ -176,3 +176,22 @@ export function trackSynthesis(
     ...details,
   });
 }
+
+/**
+ * Get or create a session ID (client-side)
+ */
+export function getOrCreateSessionId(): string {
+  if (typeof window === 'undefined') {
+    return 'server_session';
+  }
+
+  const key = 'sensory_agent_session_id';
+  let sessionId = localStorage.getItem(key);
+
+  if (!sessionId) {
+    sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    localStorage.setItem(key, sessionId);
+  }
+
+  return sessionId;
+}

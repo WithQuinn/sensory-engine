@@ -15,7 +15,7 @@ interface CacheEntry<T> {
 class VenueCache {
   private cache: Map<string, CacheEntry<VenueEnrichment>> = new Map();
   private readonly defaultTTLMs = 5 * 60 * 1000; // 5 minutes
-  private cleanupInterval: NodeJS.Timer | null = null;
+  private cleanupInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
     this.startCleanupInterval();

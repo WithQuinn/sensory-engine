@@ -21,14 +21,17 @@ let requestCounter = 0;
 
 function createRequest(body: unknown, origin: string = 'http://localhost:3000'): NextRequest {
   requestCounter++;
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'X-Forwarded-For': `10.2.${Math.floor(requestCounter / 256)}.${requestCounter % 256}`,
+    'Origin': origin,
+  };
+  if (origin === 'http://localhost:3000') {
+    headers['X-CSRF-Token'] = 'valid';
+  }
   return new NextRequest('http://localhost/api/synthesize-sense', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Forwarded-For': `10.2.${Math.floor(requestCounter / 256)}.${requestCounter % 256}`,
-      'Origin': origin,
-      'X-CSRF-Token': origin === 'http://localhost:3000' ? 'valid' : undefined,
-    },
+    headers,
     body: JSON.stringify(body),
   });
 }

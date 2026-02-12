@@ -23,8 +23,7 @@ const mockVenueHighFame: VenueEnrichment = {
   historical_significance: 'Built for the 1889 World\'s Fair. Symbol of French engineering.',
   unique_claims: ['Most-visited paid monument in the world', 'Was the tallest structure until 1930'],
   fame_score: 0.95,
-  source: 'wikipedia',
-  fetched_at: new Date().toISOString(),
+  wikipedia_url: 'https://en.wikipedia.org/wiki/Eiffel_Tower',
 };
 
 const mockVenueHistorical: VenueEnrichment = {
@@ -35,8 +34,7 @@ const mockVenueHistorical: VenueEnrichment = {
   historical_significance: 'Tokyo\'s oldest temple, dedicated to Kannon.',
   unique_claims: [],
   fame_score: 0.7,
-  source: 'wikipedia',
-  fetched_at: new Date().toISOString(),
+  wikipedia_url: 'https://en.wikipedia.org/wiki/Senso-ji',
 };
 
 const mockVenueDining: VenueEnrichment = {
@@ -47,8 +45,7 @@ const mockVenueDining: VenueEnrichment = {
   historical_significance: null,
   unique_claims: ['Pioneered the individual booth dining concept'],
   fame_score: 0.5,
-  source: 'wikipedia',
-  fetched_at: new Date().toISOString(),
+  wikipedia_url: null,
 };
 
 const mockVenueNature: VenueEnrichment = {
@@ -59,8 +56,7 @@ const mockVenueNature: VenueEnrichment = {
   historical_significance: 'Formed over 5-6 million years of geological history.',
   unique_claims: ['One of the Seven Natural Wonders of the World'],
   fame_score: 0.92,
-  source: 'wikipedia',
-  fetched_at: new Date().toISOString(),
+  wikipedia_url: 'https://en.wikipedia.org/wiki/Grand_Canyon',
 };
 
 // =============================================================================
@@ -197,8 +193,7 @@ describe('suggestNarrativeAngle', () => {
       historical_significance: null,
       unique_claims: [],
       fame_score: 0.2,
-      source: 'mock',
-      fetched_at: new Date().toISOString(),
+      wikipedia_url: null,
     };
     expect(suggestNarrativeAngle(genericVenue)).toBe('experiential');
   });

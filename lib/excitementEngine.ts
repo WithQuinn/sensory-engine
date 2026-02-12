@@ -31,34 +31,6 @@ export interface TranscendenceResult {
 // =============================================================================
 
 /**
- * Template patterns for excitement hooks
- * These make venues feel special by highlighting unique aspects
- */
-const HOOK_TEMPLATES = {
-  historical: [
-    "You're standing where {event} for {years} years",
-    "This place has welcomed visitors since {year}",
-    "{years} years of history beneath your feet",
-    "One of {city}'s oldest surviving {type}s, since {year}",
-  ],
-  fame: [
-    "One of the most {superlative} {type}s in {region}",
-    "A {type} that draws {visitors} visitors each year",
-    "Known worldwide for its {feature}",
-    "{claim}",
-  ],
-  unesco: [
-    "A UNESCO World Heritage Site since {year}",
-    "Protected as a treasure of world heritage",
-    "One of humanity's great cultural achievements",
-  ],
-  superlative: [
-    "The {superlative} in {region}",
-    "Among the {superlative} in the world",
-  ],
-};
-
-/**
  * Generate an excitement hook for a venue
  */
 export function generateExcitementHook(venue: VenueEnrichment | null): string | null {

@@ -24,28 +24,6 @@ interface ExtractedPhotoData {
   };
 }
 
-function parseExifDate(dateString: string | undefined): string | null {
-  if (!dateString) return null;
-  // EXIF format: "YYYY:MM:DD HH:MM:SS"
-  const match = dateString.match(/^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})$/);
-  if (match) {
-    const [, year, month, day, hour, min, sec] = match;
-    return new Date(`${year}-${month}-${day}T${hour}:${min}:${sec}`).toISOString();
-  }
-  return null;
-}
-
-function convertDMSToDecimal(
-  dms: number[] | undefined,
-  ref: string | undefined
-): number | null {
-  if (!dms || dms.length !== 3) return null;
-  const [degrees, minutes, seconds] = dms;
-  let decimal = degrees + minutes / 60 + seconds / 3600;
-  if (ref === 'S' || ref === 'W') decimal = -decimal;
-  return decimal;
-}
-
 async function extractExifData(file: File): Promise<{
   timestamp: string | null;
   coordinates: { lat: number; lon: number } | null;
@@ -65,7 +43,7 @@ async function extractExifData(file: File): Promise<{
       // For production, use a library like exif-js
       // This is a minimal implementation for demo purposes
       let timestamp: string | null = null;
-      let coordinates: { lat: number; lon: number } | null = null;
+      const coordinates: { lat: number; lon: number } | null = null;
 
       // Use file's lastModified as fallback timestamp
       if (file.lastModified) {
@@ -80,7 +58,7 @@ async function extractExifData(file: File): Promise<{
 }
 
 // Simple client-side image analysis (simulated - in production, use CoreML/TensorFlow.js)
-async function analyzeImageLocally(file: File): Promise<ExtractedPhotoData['localAnalysis']> {
+async function analyzeImageLocally(_file: File): Promise<ExtractedPhotoData['localAnalysis']> {
   // In production iOS app, this would use CoreML/Vision framework
   // For web demo, return placeholder values
   return {
