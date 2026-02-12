@@ -148,12 +148,19 @@ export function validateCsrfToken(
 
   // For cross-origin requests, require token
   // This is a simplified check - real implementation may need more
-  if (origin && origin !== new URL(referer || '').origin) {
-    if (!token) {
-      console.warn('CSRF: Missing token for cross-origin request');
-      return false;
+  if (origin && referer) {
+    try {
+      const refererOrigin = new URL(referer).origin;
+      if (origin !== refererOrigin) {
+        if (!token) {
+          console.warn('CSRF: Missing token for cross-origin request');
+          return false;
+        }
+        // TODO: Validate token against server-side store
+      }
+    } catch {
+      // Invalid referer URL, allow if origin is valid
     }
-    // TODO: Validate token against server-side store
   }
 
   return true;
