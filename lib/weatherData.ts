@@ -5,6 +5,7 @@
 // =============================================================================
 
 import { z } from 'zod';
+import { OpenWeatherResponseSchema, CoordinatesSchema } from './sensoryValidation';
 
 // =============================================================================
 // TYPES
@@ -28,21 +29,8 @@ export const WeatherFetchResultSchema = z.object({
 });
 export type WeatherFetchResult = z.infer<typeof WeatherFetchResultSchema>;
 
-// OpenWeather API response shape
-interface OpenWeatherResponse {
-  weather: Array<{
-    main: string;
-    description: string;
-  }>;
-  main: {
-    temp: number;
-    humidity: number;
-    feels_like: number;
-  };
-  wind?: {
-    speed: number;
-  };
-}
+// Use validated type from sensoryValidation
+export type OpenWeatherResponse = z.infer<typeof OpenWeatherResponseSchema>;
 
 // =============================================================================
 // PRIVACY: COARSE COORDINATE ROUNDING
@@ -192,7 +180,21 @@ export async function fetchWeather(
       };
     }
 
-    const data = await response.json() as OpenWeatherResponse;
+    const rawData = await response.json();
+
+    // Validate response against schema
+    const validated = OpenWeatherResponseSchema.safeParse(rawData);
+    if (!validated.success) {
+      console.error('OpenWeather response validation failed:', validated.error.errors);
+      return {
+        success: false,
+        data: null,
+        error: 'Invalid OpenWeather API response format',
+        coarse_location_used: true,
+      };
+    }
+
+    const data = validated.data;
 
     const weatherData: WeatherData = {
       condition: data.weather[0]?.main || 'Unknown',

@@ -5,7 +5,7 @@
 // =============================================================================
 
 import { z } from 'zod';
-import { VenueCategoryEnum } from './sensoryValidation';
+import { VenueCategoryEnum, WikipediaSearchResponseSchema, WikipediaPageResponseSchema } from './sensoryValidation';
 
 // =============================================================================
 // TYPES
@@ -247,9 +247,18 @@ async function searchWikipedia(query: string): Promise<WikiSearchResult | null> 
 
     if (!response.ok) return null;
 
-    const data = await response.json() as WikiSearchResponse;
-    return data.query?.search[0] || null;
-  } catch {
+    const data = await response.json();
+
+    // Validate response against schema
+    const validated = WikipediaSearchResponseSchema.safeParse(data);
+    if (!validated.success) {
+      console.error('Wikipedia search response validation failed:', validated.error.errors);
+      return null;
+    }
+
+    return validated.data.query?.search[0] || null;
+  } catch (error) {
+    console.error('Wikipedia search error:', error instanceof Error ? error.message : String(error));
     return null;
   }
 }
@@ -311,8 +320,16 @@ async function fetchWikipediaPage(title: string): Promise<WikipediaData | null> 
 
     if (!response.ok) return null;
 
-    const data = await response.json() as WikiPageResponse;
-    const pages = data.query?.pages;
+    const data = await response.json();
+
+    // Validate response against schema
+    const validated = WikipediaPageResponseSchema.safeParse(data);
+    if (!validated.success) {
+      console.error('Wikipedia page response validation failed:', validated.error.errors);
+      return null;
+    }
+
+    const pages = validated.data.query?.pages;
     if (!pages) return null;
 
     const page = Object.values(pages)[0];
@@ -330,7 +347,8 @@ async function fetchWikipediaPage(title: string): Promise<WikipediaData | null> 
       categories,
       page_url: page.fullurl || null,
     };
-  } catch {
+  } catch (error) {
+    console.error('Wikipedia page fetch error:', error instanceof Error ? error.message : String(error));
     return null;
   }
 }

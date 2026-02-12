@@ -589,3 +589,126 @@ export function getTranscendenceTier(score: number): string {
   if (score >= 0.3) return 'normal';
   return 'forgettable';
 }
+
+// =============================================================================
+// EXTERNAL API RESPONSE SCHEMAS (for validation)
+// =============================================================================
+
+/**
+ * OpenWeather API response schema
+ * https://openweathermap.org/api
+ */
+export const OpenWeatherResponseSchema = z.object({
+  coord: z.object({
+    lon: z.number(),
+    lat: z.number(),
+  }),
+  weather: z.array(z.object({
+    id: z.number(),
+    main: z.string(),
+    description: z.string(),
+    icon: z.string(),
+  })).min(1),
+  main: z.object({
+    temp: z.number(),
+    feels_like: z.number(),
+    temp_min: z.number(),
+    temp_max: z.number(),
+    pressure: z.number(),
+    humidity: z.number(),
+  }),
+  wind: z.object({
+    speed: z.number(),
+    deg: z.number().optional(),
+  }),
+  visibility: z.number().optional(),
+  clouds: z.object({
+    all: z.number(),
+  }).optional(),
+  dt: z.number(),
+  timezone: z.number().optional(),
+  id: z.number().optional(),
+  name: z.string().optional(),
+});
+
+export type OpenWeatherResponse = z.infer<typeof OpenWeatherResponseSchema>;
+
+/**
+ * Wikipedia API search response schema
+ */
+export const WikipediaSearchResponseSchema = z.object({
+  batchcomplete: z.boolean(),
+  query: z.object({
+    search: z.array(z.object({
+      ns: z.number(),
+      title: z.string(),
+      pageid: z.number(),
+      size: z.number(),
+      wordcount: z.number(),
+      snippet: z.string(),
+      timestamp: z.string(),
+    })),
+  }),
+});
+
+export type WikipediaSearchResponse = z.infer<typeof WikipediaSearchResponseSchema>;
+
+/**
+ * Wikipedia page content response schema
+ */
+export const WikipediaPageResponseSchema = z.object({
+  batchcomplete: z.boolean(),
+  query: z.object({
+    pages: z.record(z.object({
+      pageid: z.number(),
+      ns: z.number(),
+      title: z.string(),
+      extract: z.string(),
+      description: z.string().optional(),
+      categories: z.array(z.object({
+        sortkey: z.string(),
+        title: z.string(),
+      })).optional(),
+      fullurl: z.string().optional(),
+    })),
+  }),
+});
+
+export type WikipediaPageResponse = z.infer<typeof WikipediaPageResponseSchema>;
+
+/**
+ * Claude API message response schema
+ */
+export const ClaudeMessageResponseSchema = z.object({
+  id: z.string(),
+  type: z.literal('message'),
+  role: z.enum(['assistant', 'user']),
+  content: z.array(z.object({
+    type: z.enum(['text', 'thinking']),
+    text: z.string().optional(),
+  })),
+  model: z.string(),
+  stop_reason: z.enum(['end_turn', 'max_tokens', 'stop_sequence']).optional(),
+  stop_sequence: z.string().optional(),
+  usage: z.object({
+    input_tokens: z.number(),
+    output_tokens: z.number(),
+  }),
+});
+
+export type ClaudeMessageResponse = z.infer<typeof ClaudeMessageResponseSchema>;
+
+/**
+ * Helper function to safely validate coordinate bounds
+ */
+export function validateCoordinates(lat: number, lon: number): boolean {
+  return lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
+}
+
+/**
+ * Schema for coordinates with bounds validation
+ */
+export const CoordinatesSchema = z.object({
+  lat: z.number().min(-90).max(90),
+  lon: z.number().min(-180).max(180),
+});
