@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Emotional Intensity Demo - Sensory Engine</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 50%, #0f0f1a 100%);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      color: #e8e6e3;
+      padding: 40px 20px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 300;
+      margin-bottom: 12px;
+      letter-spacing: -0.5px;
+    }
+
+    .subtitle {
+      color: rgba(200, 180, 160, 0.6);
+      font-size: 14px;
+      margin-bottom: 40px;
+    }
+
+    .demo-section {
+      background: rgba(200, 180, 160, 0.05);
+      border: 1px solid rgba(200, 180, 160, 0.2);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .demo-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #e8e6e3;
+      margin-bottom: 16px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .image-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .image-card {
+      aspect-ratio: 1;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      border: 2px solid transparent;
+    }
+
+    .image-card:hover {
+      transform: scale(1.05);
+      border-color: rgba(200, 180, 160, 0.3);
+    }
+
+    .image-card-label {
+      font-size: 11px;
+      text-align: center;
+      padding: 8px;
+      margin-top: 8px;
+      color: rgba(200, 180, 160, 0.8);
+    }
+
+    .emotion-detection {
+      background: rgba(200, 180, 160, 0.1);
+      border-left: 3px solid rgba(90, 138, 106, 0.5);
+      padding: 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      margin-top: 8px;
+    }
+
+    .emotion-detection strong {
+      color: rgba(90, 138, 106, 0.9);
+    }
+
+    .keyword-input {
+      width: 100%;
+      padding: 12px;
+      background: transparent;
+      border: 1px solid rgba(200, 180, 160, 0.3);
+      border-radius: 8px;
+      color: #e8e6e3;
+      font-size: 14px;
+      margin-bottom: 16px;
+    }
+
+    .keyword-input::placeholder {
+      color: rgba(200, 180, 160, 0.4);
+    }
+
+    .slider-container {
+      margin: 24px 0;
+    }
+
+    .slider-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #e8e6e3;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .slider {
+      width: 100%;
+      height: 6px;
+      border-radius: 8px;
+      background: linear-gradient(to right, rgba(200, 180, 160, 0.2), rgba(90, 138, 106, 0.5));
+      outline: none;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    .slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: rgba(200, 180, 160, 0.8);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .slider::-webkit-slider-thumb:hover {
+      background: rgba(200, 180, 160, 1);
+      box-shadow: 0 0 8px rgba(200, 180, 160, 0.3);
+    }
+
+    .slider::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: rgba(200, 180, 160, 0.8);
+      cursor: pointer;
+      border: none;
+    }
+
+    .recommendation-badge {
+      display: inline-block;
+      background: rgba(90, 138, 106, 0.15);
+      border: 1px solid rgba(90, 138, 106, 0.3);
+      color: rgba(90, 138, 106, 0.9);
+      padding: 6px 12px;
+      border-radius: 16px;
+      font-size: 11px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .guidance-card {
+      margin-top: 16px;
+      padding: 12px;
+      background: rgba(200, 180, 160, 0.05);
+      border-radius: 8px;
+      border: 1px solid rgba(200, 180, 160, 0.2);
+    }
+
+    .guidance-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #e8e6e3;
+      margin-bottom: 4px;
+    }
+
+    .guidance-example {
+      font-size: 11px;
+      color: rgba(200, 180, 160, 0.6);
+      margin-bottom: 4px;
+    }
+
+    .guidance-tone {
+      font-size: 11px;
+      color: rgba(200, 180, 160, 0.5);
+      font-style: italic;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .stat-item {
+      background: rgba(90, 138, 106, 0.1);
+      padding: 8px;
+      border-radius: 6px;
+      font-size: 11px;
+    }
+
+    .stat-label {
+      color: rgba(200, 180, 160, 0.6);
+      font-size: 10px;
+      text-transform: uppercase;
+    }
+
+    .stat-value {
+      color: rgba(90, 138, 106, 0.9);
+      font-weight: 600;
+      margin-top: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎬 Emotional Intensity Demo</h1>
+    <p class="subtitle">Test how photos and keywords affect sentiment recommendations</p>
+
+    <!-- Scene 1: Beach -->
+    <div class="demo-section">
+      <div class="demo-title">📸 Scene 1: Tropical Beach</div>
+
+      <div class="image-grid">
+        <div class="image-card" style="background: linear-gradient(135deg, #FFD700 0%, #FFA500 50%, #87CEEB 100%);" onclick="selectScene('beach')">
+          <div class="image-card-label">Bright<br>Saturated<br>Warm</div>
+        </div>
+      </div>
+
+      <div class="emotion-detection">
+        <strong>✨ Detected Emotion: Joy</strong><br>
+        Brightness: 220/255 | Saturation: 0.8 | Hue: 45° (warm yellows/oranges)
+      </div>
+
+      <label class="slider-label">Keywords</label>
+      <input type="text" class="keyword-input" id="beach-keywords" placeholder="e.g., amazing, beautiful, dream" value="amazing, beautiful, paradise">
+
+      <div class="slider-container">
+        <label class="slider-label" id="beach-label">Recommendation: 85%</label>
+        <div class="recommendation-badge">✨ High Confidence (photos + keywords)</div>
+        <input type="range" class="slider" min="0" max="1" step="0.05" value="0.85" oninput="updateScene('beach', this.value)">
+      </div>
+
+      <div class="guidance-card">
+        <div class="guidance-label">Very High Intensity</div>
+        <div class="guidance-example"><strong>Best for:</strong> Skydiving, proposal, dream destination, once-in-a-lifetime moment</div>
+        <div class="guidance-tone">Your story will be told in an exhilarating, vivid voice with dramatic language</div>
+      </div>
+
+      <div class="stats">
+        <div class="stat-item">
+          <div class="stat-label">Photo Score</div>
+          <div class="stat-value">0.85 (joy)</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Keyword Score</div>
+          <div class="stat-value">0.85 (positive)</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Combined</div>
+          <div class="stat-value">0.85</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Confidence</div>
+          <div class="stat-value">High</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scene 2: Forest/Nature -->
+    <div class="demo-section">
+      <div class="demo-title">🌲 Scene 2: Peaceful Forest</div>
+
+      <div class="image-grid">
+        <div class="image-card" style="background: linear-gradient(135deg, #2d5016 0%, #4a7c3e 50%, #1a3a2a 100%);" onclick="selectScene('forest')">
+          <div class="image-card-label">Moderate<br>Green<br>Calm</div>
+        </div>
+      </div>
+
+      <div class="emotion-detection">
+        <strong>☮️ Detected Emotion: Serenity</strong><br>
+        Brightness: 145/255 | Saturation: 0.4 | Hue: 120° (greens/blues)
+      </div>
+
+      <label class="slider-label">Keywords</label>
+      <input type="text" class="keyword-input" id="forest-keywords" placeholder="e.g., peaceful, serene, calm" value="peaceful, serene, tranquil">
+
+      <div class="slider-container">
+        <label class="slider-label" id="forest-label">Recommendation: 55%</label>
+        <div class="recommendation-badge">✨ High Confidence (photos + keywords)</div>
+        <input type="range" class="slider" min="0" max="1" step="0.05" value="0.55" oninput="updateScene('forest', this.value)">
+      </div>
+
+      <div class="guidance-card">
+        <div class="guidance-label">Moderate Intensity</div>
+        <div class="guidance-example"><strong>Best for:</strong> Pleasant experience, nice walk, enjoyable sightseeing</div>
+        <div class="guidance-tone">Your story will be warm and appreciative</div>
+      </div>
+
+      <div class="stats">
+        <div class="stat-item">
+          <div class="stat-label">Photo Score</div>
+          <div class="stat-value">0.55 (serenity)</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Keyword Score</div>
+          <div class="stat-value">0.60 (positive)</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Combined</div>
+          <div class="stat-value">0.58</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Confidence</div>
+          <div class="stat-value">High</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scene 3: Sunset -->
+    <div class="demo-section">
+      <div class="demo-title">🌅 Scene 3: Golden Hour Sunset</div>
+
+      <div class="image-grid">
+        <div class="image-card" style="background: linear-gradient(135deg, #FF6B35 0%, #FFB366 50%, #FF8C42 100%);" onclick="selectScene('sunset')">
+          <div class="image-card-label">Bright<br>Vivid<br>Golden</div>
+        </div>
+      </div>
+
+      <div class="emotion-detection">
+        <strong>🌟 Detected Emotion: Awe</strong><br>
+        Brightness: 215/255 | Saturation: 0.75 | Hue: 30° (golden/orange)
+      </div>
+
+      <label class="slider-label">Keywords</label>
+      <input type="text" class="keyword-input" id="sunset-keywords" placeholder="e.g., stunning, breathtaking, wow" value="stunning, breathtaking, magical">
+
+      <div class="slider-container">
+        <label class="slider-label" id="sunset-label">Recommendation: 75%</label>
+        <div class="recommendation-badge">✨ High Confidence (photos + keywords)</div>
+        <input type="range" class="slider" min="0" max="1" step="0.05" value="0.75" oninput="updateScene('sunset', this.value)">
+      </div>
+
+      <div class="guidance-card">
+        <div class="guidance-label">High Intensity</div>
+        <div class="guidance-example"><strong>Best for:</strong> Exciting discovery, amazing meal, breathtaking view</div>
+        <div class="guidance-tone">Your story will be enthusiastic and expressive</div>
+      </div>
+
+      <div class="stats">
+        <div class="stat-item">
+          <div class="stat-label">Photo Score</div>
+          <div class="stat-value">0.75 (awe)</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Keyword Score</div>
+          <div class="stat-value">0.80 (very positive)</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Combined</div>
+          <div class="stat-value">0.78</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Confidence</div>
+          <div class="stat-value">High</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scene 4: Vintage/Faded -->
+    <div class="demo-section">
+      <div class="demo-title">📷 Scene 4: Vintage Memory</div>
+
+      <div class="image-grid">
+        <div class="image-card" style="background: linear-gradient(135deg, #9B8B7E 0%, #B5A89D 50%, #8B7D72 100%);" onclick="selectScene('vintage')">
+          <div class="image-card-label">Muted<br>Desaturated<br>Warm</div>
+        </div>
+      </div>
+
+      <div class="emotion-detection">
+        <strong>🎞️ Detected Emotion: Nostalgia</strong><br>
+        Brightness: 160/255 | Saturation: 0.25 | Hue: 30° (warm/tan)
+      </div>
+
+      <label class="slider-label">Keywords</label>
+      <input type="text" class="keyword-input" id="vintage-keywords" placeholder="e.g., remember, childhood, memories" value="remember, childhood, nostalgic">
+
+      <div class="slider-container">
+        <label class="slider-label" id="vintage-label">Recommendation: 45%</label>
+        <div class="recommendation-badge">✨ High Confidence (photos + keywords)</div>
+        <input type="range" class="slider" min="0" max="1" step="0.05" value="0.45" oninput="updateScene('vintage', this.value)">
+      </div>
+
+      <div class="guidance-card">
+        <div class="guidance-label">Low-Moderate Intensity</div>
+        <div class="guidance-example"><strong>Best for:</strong> Quiet reflection, peaceful moment, gentle observation</div>
+        <div class="guidance-tone">Your story will be calm and contemplative</div>
+      </div>
+
+      <div class="stats">
+        <div class="stat-item">
+          <div class="stat-label">Photo Score</div>
+          <div class="stat-value">0.45 (nostalgia)</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Keyword Score</div>
+          <div class="stat-value">0.50 (neutral)</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Combined</div>
+          <div class="stat-value">0.48</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Confidence</div>
+          <div class="stat-value">High</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function getIntensityGuidance(intensity) {
+      if (intensity >= 0.8) {
+        return {
+          label: 'Very High Intensity',
+          example: 'Perfect for: Skydiving, proposal, dream destination, once-in-a-lifetime moment',
+          tone: 'Your story will be told in an exhilarating, vivid voice with dramatic language'
+        };
+      }
+      if (intensity >= 0.6) {
+        return {
+          label: 'High Intensity',
+          example: 'Great for: Exciting discovery, amazing meal, breathtaking view',
+          tone: 'Your story will be enthusiastic and expressive'
+        };
+      }
+      if (intensity >= 0.4) {
+        return {
+          label: 'Moderate Intensity',
+          example: 'Ideal for: Pleasant experience, nice walk, enjoyable sightseeing',
+          tone: 'Your story will be warm and appreciative'
+        };
+      }
+      if (intensity >= 0.2) {
+        return {
+          label: 'Low Intensity',
+          example: 'Good for: Quiet reflection, peaceful moment, gentle observation',
+          tone: 'Your story will be calm and contemplative'
+        };
+      }
+      return {
+        label: 'Very Low Intensity',
+        example: 'Appropriate for: Somber memorial, quiet contemplation, subtle moment',
+        tone: 'Your story will be gentle and reflective'
+      };
+    }
+
+    function updateScene(scene, value) {
+      const intensity = parseFloat(value);
+      const percentage = Math.round(intensity * 100);
+      const guidance = getIntensityGuidance(intensity);
+
+      document.getElementById(scene + '-label').textContent = `Recommendation: ${percentage}%`;
+
+      const guidanceCard = document.querySelector(`#${scene}-keywords`).closest('.demo-section').querySelector('.guidance-card');
+      guidanceCard.querySelector('.guidance-label').textContent = guidance.label;
+      guidanceCard.querySelector('.guidance-example').innerHTML = `<strong>Best for:</strong> ${guidance.example.replace('Best for: ', '')}`;
+      guidanceCard.querySelector('.guidance-tone').textContent = guidance.tone;
+    }
+
+    function selectScene(scene) {
+      alert(`Scene selected: ${scene}\n\nIn the Sensory Engine, uploading photos like this would automatically detect the emotion and pre-populate the slider!`);
+    }
+  </script>
+</body>
+</html>
