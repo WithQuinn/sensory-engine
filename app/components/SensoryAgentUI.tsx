@@ -285,24 +285,51 @@ async function analyzeImageLocally(file: File): Promise<ExtractedPhotoData['loca
 function analyzeKeywordSentiment(keywords: string): number {
   const words = keywords.toLowerCase().split(/[,\s]+/).filter(Boolean);
 
+  // Very Positive: Strong emotional intensity
+  const veryPositiveWords = new Set([
+    'ecstatic', 'euphoric', 'blissful', 'extraordinary', 'unforgettable',
+    'once-in-a-lifetime', 'mind-blowing', 'phenomenal', 'transcendent',
+    'divine', 'heavenly', 'sublime', 'magnificent', 'glorious', 'awe-inspiring',
+    'mind-expanding', 'life-changing', 'life-altering', 'surreal', 'magical',
+    'enchanting', 'mesmerizing', 'spellbinding', 'breathtaking',
+  ]);
+
+  // Positive: Strong positive emotions
   const positiveWords = new Set([
     'amazing', 'beautiful', 'wonderful', 'joy', 'happy', 'excited', 'love',
     'dream', 'perfect', 'awesome', 'incredible', 'fantastic', 'peaceful',
-    'serene', 'transcendent', 'magical', 'stunning', 'breathtaking',
+    'serene', 'stunning', 'delightful', 'wonderful', 'lovely', 'charming',
+    'exquisite', 'marvelous', 'splendid', 'excellent', 'superb', 'outstanding',
+    'remarkable', 'unforgettable', 'memorable', 'captivating', 'enchanted',
+    'enamored', 'elated', 'thrilled', 'overjoyed', 'blessed', 'grateful',
+    'content', 'blissful', 'joyful', 'radiant', 'vibrant', 'alive', 'energy',
+    'inspired', 'uplifted', 'enlightened', 'awakened', 'connected', 'united',
+    'grateful', 'abundant', 'rich', 'full', 'complete', 'whole',
   ]);
 
+  // Moderate: Mild positive
+  const moderateWords = new Set([
+    'nice', 'good', 'pleasant', 'okay', 'fine', 'decent', 'alright',
+    'enjoyable', 'comfortable', 'relaxing', 'calming', 'soothing', 'gentle',
+    'soft', 'quiet', 'still', 'peaceful', 'restful', 'restorative',
+    'interesting', 'intriguing', 'curious', 'engaging', 'inviting',
+  ]);
+
+  // Negative: Mild to moderate negative
   const negativeWords = new Set([
     'sad', 'disappointed', 'boring', 'crowded', 'rushed', 'stressful',
     'tired', 'frustrated', 'difficult', 'overwhelming', 'anxious',
+    'uncomfortable', 'unsettling', 'strange', 'odd', 'awkward', 'tense',
+    'hectic', 'chaotic', 'messy', 'ugly', 'draining', 'exhausting',
+    'annoyed', 'irritated', 'upset', 'confused', 'lost', 'alone',
+    'empty', 'hollow', 'numb', 'blank', 'gray', 'dull', 'flat',
   ]);
 
-  const veryPositiveWords = new Set([
-    'ecstatic', 'euphoric', 'blissful', 'extraordinary', 'unforgettable',
-    'once-in-a-lifetime', 'mind-blowing', 'phenomenal',
-  ]);
-
-  const moderateWords = new Set([
-    'nice', 'good', 'pleasant', 'okay', 'fine', 'decent', 'alright',
+  // Very Negative: Strong negative emotions
+  const veryNegativeWords = new Set([
+    'terrible', 'horrible', 'awful', 'dreadful', 'miserable', 'depressing',
+    'agonizing', 'heartbreaking', 'devastating', 'traumatic', 'painful',
+    'torturous', 'nightmarish', 'hellish', 'dark', 'grim', 'bleak',
   ]);
 
   let sentimentScore = 0.5;
@@ -320,6 +347,9 @@ function analyzeKeywordSentiment(keywords: string): number {
       wordCount++;
     } else if (negativeWords.has(word)) {
       sentimentScore -= 0.1;
+      wordCount++;
+    } else if (veryNegativeWords.has(word)) {
+      sentimentScore -= 0.15;
       wordCount++;
     }
   }
@@ -382,6 +412,63 @@ function calculateRecommendedSentiment(
     value: Math.max(0, Math.min(1, recommendedValue)),
     confidence,
     sources,
+  };
+}
+
+// =============================================================================
+// Impact Preview - Shows how emotional intensity affects transcendence score
+// =============================================================================
+function getTranscendenceImpact(emotionalIntensity: number): {
+  score: number;
+  level: string;
+  description: string;
+} {
+  // Transcendence score calculation (simplified):
+  // emotion_intensity: 25% weight (0.25)
+  // atmosphere_quality: 15% (0.15)
+  // novelty_factor: 15% (0.15)
+  // fame_score: 10% (0.10)
+  // weather_match: 10% (0.10)
+  // companion_engagement: 10% (0.10)
+  // intent_match: 10% (0.10)
+  // surprise_factor: 5% (0.05)
+
+  // Assume average scores for other factors
+  const otherFactorsAverage = 0.5; // Conservative estimate (50%)
+  const emotionContribution = emotionalIntensity * 0.25; // 25% weight
+  const otherFactorsContribution = otherFactorsAverage * 0.75; // 75% combined weight
+  const totalScore = (emotionContribution + otherFactorsContribution) * 10; // Scale to 0-10
+
+  let level = '';
+  let description = '';
+
+  if (totalScore >= 8.5) {
+    level = 'Transcendent';
+    description = 'A once-in-a-lifetime memory that will be cherished forever';
+  } else if (totalScore >= 7.5) {
+    level = 'Exceptional';
+    description = 'An extraordinary experience worth reliving again and again';
+  } else if (totalScore >= 6.5) {
+    level = 'Memorable';
+    description = 'A wonderful moment that stands out from everyday experiences';
+  } else if (totalScore >= 5.5) {
+    level = 'Meaningful';
+    description = 'A pleasant experience with emotional depth and significance';
+  } else if (totalScore >= 4.5) {
+    level = 'Notable';
+    description = 'A worthy moment that adds value to your journey';
+  } else if (totalScore >= 3.5) {
+    level = 'Interesting';
+    description = 'A nice experience that captures a moment in time';
+  } else {
+    level = 'Reflective';
+    description = 'A quiet moment worth preserving for later reflection';
+  }
+
+  return {
+    score: Math.round(totalScore * 10) / 10,
+    level,
+    description,
   };
 }
 
@@ -969,6 +1056,56 @@ export default function SensoryAgentUI({ onMomentCreated }: SensoryAgentUIProps)
                 >
                   {getIntensityGuidance(voiceSentiment).tone}
                 </p>
+              </div>
+
+              {/* Impact Preview - Shows transcendence score effect */}
+              <div
+                style={{
+                  marginTop: SPACING.md,
+                  padding: SPACING.md,
+                  background: `linear-gradient(135deg, ${THEME.green[100]} 0%, rgba(90, 138, 106, 0.05) 100%)`,
+                  borderRadius: BORDER_RADIUS.md,
+                  border: `1px solid ${THEME.green[300]}`,
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    color: THEME.green.text,
+                    marginBottom: SPACING.xs,
+                    margin: 0,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                  }}
+                >
+                  💫 Transcendence Impact
+                </p>
+
+                <div style={{ marginTop: SPACING.sm }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: SPACING.xs }}>
+                    <span style={{ fontSize: '16px', fontWeight: 600, color: THEME.green.text }}>
+                      {getTranscendenceImpact(voiceSentiment).score}/10
+                    </span>
+                    <span style={{ fontSize: '11px', color: THEME.green.text }}>
+                      {getTranscendenceImpact(voiceSentiment).level}
+                    </span>
+                  </div>
+                  <p
+                    style={{
+                      fontSize: '10px',
+                      color: THEME.green.text,
+                      lineHeight: 1.4,
+                      margin: `${SPACING.xs} 0 0 0`,
+                    }}
+                  >
+                    {getTranscendenceImpact(voiceSentiment).description}
+                  </p>
+                </div>
+
+                <div style={{ marginTop: SPACING.sm, fontSize: '10px', color: 'rgba(90, 138, 106, 0.6)' }}>
+                  <strong>Note:</strong> Score assumes average quality for photos, atmosphere, and venue. Actual score increases with better photos and more unique venues.
+                </div>
               </div>
             </div>
 
