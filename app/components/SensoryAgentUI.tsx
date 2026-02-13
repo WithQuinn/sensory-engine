@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { trackEvent, getOrCreateSessionId } from '@/lib/telemetry';
 import { THEME, SPACING, BORDER_RADIUS } from '@/lib/uiTheme';
 import { Button, Card, Pill, Input, LoadingState, Divider, EmotionTag } from '@/lib/uiComponents';
@@ -27,6 +27,64 @@ interface ExtractedPhotoData {
 }
 
 type ProcessingState = 'idle' | 'processing' | 'success' | 'error';
+
+// =============================================================================
+// Particle Component (ambient floating effect)
+// =============================================================================
+
+function Particles() {
+  const [particles, setParticles] = useState<Array<{
+    id: number;
+    left: number;
+    top: number;
+    size: number;
+    duration: number;
+    delay: number;
+  }>>([]);
+
+  useEffect(() => {
+    const newParticles = Array.from({ length: 15 }, (_, i) => ({
+      id: i,
+      left: Math.random() * 100,
+      top: Math.random() * 100,
+      size: Math.random() * 3 + 1,
+      duration: Math.random() * 20 + 10,
+      delay: Math.random() * 5,
+    }));
+    setParticles(newParticles);
+  }, []);
+
+  return (
+    <>
+      <style>{`
+        @keyframes float {
+          0%, 100% { transform: translateY(0) translateX(0); opacity: 0.3; }
+          25% { transform: translateY(-20px) translateX(10px); opacity: 0.6; }
+          50% { transform: translateY(-10px) translateX(-5px); opacity: 0.4; }
+          75% { transform: translateY(-25px) translateX(5px); opacity: 0.5; }
+        }
+      `}</style>
+      {particles.map((p) => (
+        <div
+          key={p.id}
+          style={{
+            position: 'fixed',
+            left: `${p.left}%`,
+            top: `${p.top}%`,
+            width: p.size,
+            height: p.size,
+            borderRadius: '50%',
+            background: 'rgba(200, 180, 160, 0.15)',
+            animation: `float ${p.duration}s ease-in-out infinite`,
+            animationDelay: `${p.delay}s`,
+            pointerEvents: 'none',
+            zIndex: 1,
+          }}
+        />
+      ))}
+    </>
+  );
+}
 
 // =============================================================================
 // EXIF Extraction (client-side only - photos never leave device)
@@ -260,478 +318,556 @@ export default function SensoryAgentUI({ onMomentCreated }: SensoryAgentUIProps)
   // =============================================================================
 
   return (
-    <div
-      style={{
-        maxWidth: '720px',
-        margin: '0 auto',
-        padding: `${SPACING.xl} ${SPACING.lg}`,
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        background: THEME.background,
-        minHeight: '100vh',
-      }}
-    >
-      {/* Header */}
-      <div style={{ marginBottom: SPACING.xxl, textAlign: 'center' }}>
-        <h1
+    <div style={{ position: 'relative', minHeight: '100vh', background: THEME.background }}>
+      {/* Ambient particles */}
+      <Particles />
+
+      {/* Header with Quinn branding */}
+      <header
+        style={{
+          padding: `${SPACING.lg} ${SPACING.xl}`,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          position: 'relative',
+          zIndex: 10,
+        }}
+      >
+        <div
           style={{
-            fontSize: '28px',
-            fontWeight: 700,
-            color: THEME.gold.text,
-            marginBottom: SPACING.sm,
-            letterSpacing: '-0.5px',
+            fontSize: '18px',
+            fontWeight: 300,
+            letterSpacing: '0.3em',
+            textTransform: 'uppercase',
+            color: '#c4b8a8',
           }}
         >
-          🎭 Sensory Agent
-        </h1>
-        <p
-          style={{
-            fontSize: '14px',
-            color: THEME.gold[600],
-            marginTop: SPACING.md,
-          }}
-        >
-          Transform your travel moments into emotional narratives
-        </p>
-      </div>
+          Quinn
+        </div>
+        <div style={{ fontSize: '12px', color: THEME.gold[600], letterSpacing: '0.1em' }}>
+          Sensory Engine
+        </div>
+      </header>
 
-      {/* Input Form */}
-      {state === 'idle' && (
-        <Card variant="default">
-          {/* Venue Name */}
-          <div style={{ marginBottom: SPACING.lg }}>
-            <Input
-              label="Venue Name"
-              placeholder="e.g., Senso-ji Temple, Eiffel Tower"
-              value={venueName}
-              onChange={(e) => setVenueName(e.target.value)}
-              error={error && !venueName.trim() ? error : undefined}
-            />
-          </div>
-
-          {/* Photo Upload */}
-          <div style={{ marginBottom: SPACING.lg }}>
-            <label
+      {/* Main Content */}
+      {state === 'idle' ? (
+        <main className="input-container" style={{ position: 'relative', zIndex: 10 }}>
+          {/* Hero Section */}
+          <div style={{ marginBottom: '60px', textAlign: 'center' }}>
+            <h1
               style={{
-                display: 'block',
-                fontSize: '14px',
-                fontWeight: 600,
+                fontSize: '48px',
+                fontWeight: 300,
+                lineHeight: 1.2,
+                marginBottom: '24px',
+                letterSpacing: '-0.02em',
                 color: THEME.gold.text,
-                marginBottom: SPACING.sm,
               }}
             >
-              Photos {photos.length > 0 && <span style={{ opacity: 0.6 }}>({photos.length})</span>}
-            </label>
-
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={handlePhotoSelect}
-              style={{ display: 'none' }}
-            />
-
-            <Button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isProcessingPhotos}
-              variant="secondary"
-              style={{
-                width: '100%',
-                justifyContent: 'center',
-                border: `2px dashed ${THEME.gold[300]}`,
-                paddingTop: SPACING.xl,
-                paddingBottom: SPACING.xl,
-              }}
-            >
-              {isProcessingPhotos ? '📸 Processing photos...' : `${photos.length === 0 ? '📷 Add Photos' : '📷 Add More'}`}
-            </Button>
-
-            {/* Photo Thumbnails */}
-            {photos.length > 0 && (
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))',
-                  gap: SPACING.md,
-                  marginTop: SPACING.lg,
-                }}
-              >
-                {photos.map((photo, index) => (
-                  <div
-                    key={index}
-                    style={{
-                      position: 'relative',
-                      aspectRatio: '1',
-                      borderRadius: BORDER_RADIUS.md,
-                      overflow: 'hidden',
-                      border: `1px solid ${THEME.gold[200]}`,
-                      backgroundColor: THEME.gold[50],
-                    }}
-                  >
-                    <img
-                      src={photo.previewUrl}
-                      alt={`Photo ${index + 1}`}
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                      }}
-                    />
-                    <button
-                      onClick={() => handleRemovePhoto(index)}
-                      style={{
-                        position: 'absolute',
-                        top: SPACING.xs,
-                        right: SPACING.xs,
-                        background: 'rgba(220, 38, 38, 0.8)',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '50%',
-                        width: '24px',
-                        height: '24px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '12px',
-                        fontWeight: 'bold',
-                      }}
-                      title="Remove photo"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <Divider />
-
-          {/* Voice Notes */}
-          <div style={{ marginBottom: SPACING.lg }}>
-            <label
-              style={{
-                display: 'block',
-                fontSize: '14px',
-                fontWeight: 600,
-                color: THEME.gold.text,
-                marginBottom: SPACING.sm,
-              }}
-            >
-              Audio Notes
-            </label>
-            <textarea
-              value={voiceKeywords}
-              onChange={(e) => setVoiceKeywords(e.target.value)}
-              placeholder="What were you feeling? Describe the moment in your own words..."
-              style={{
-                width: '100%',
-                minHeight: '80px',
-                padding: SPACING.md,
-                fontSize: '14px',
-                border: `1px solid ${THEME.gold[300]}`,
-                borderRadius: BORDER_RADIUS.md,
-                background: 'transparent',
-                color: THEME.gold.text,
-                outline: 'none',
-                fontFamily: 'inherit',
-                resize: 'vertical',
-              }}
-            />
+              Capture moments.
+              <br />
+              <span style={{ color: THEME.gold[600] }}>We'll transform them into memories.</span>
+            </h1>
             <p
               style={{
-                fontSize: '12px',
+                fontSize: '16px',
+                fontWeight: 300,
                 color: THEME.gold[600],
-                marginTop: SPACING.sm,
+                maxWidth: '520px',
+                margin: '0 auto',
+                lineHeight: 1.7,
               }}
             >
-              💭 Your notes stay on device. Used to enhance emotional synthesis.
+              Upload photos, share what you felt, and let Claude synthesize your moment into an emotional narrative enriched with sensory details.
             </p>
           </div>
 
-          {/* Sentiment */}
-          <div style={{ marginBottom: SPACING.lg }}>
-            <label
-              style={{
-                display: 'block',
-                fontSize: '14px',
-                fontWeight: 600,
-                color: THEME.gold.text,
-                marginBottom: SPACING.sm,
-              }}
-            >
-              Emotional Intensity: {Math.round(voiceSentiment * 100)}%
-            </label>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.1"
-              value={voiceSentiment}
-              onChange={(e) => setVoiceSentiment(parseFloat(e.target.value))}
-              style={{
-                width: '100%',
-                height: '6px',
-                borderRadius: BORDER_RADIUS.lg,
-                background: `linear-gradient(to right, ${THEME.gold[200]}, ${THEME.green[500]})`,
-                outline: 'none',
-                WebkitAppearance: 'none',
-              }}
-            />
-          </div>
-
-          {/* Error Message */}
-          {error && (
-            <div
-              style={{
-                padding: SPACING.lg,
-                background: 'rgba(220, 38, 38, 0.1)',
-                border: `1px solid rgba(220, 38, 38, 0.5)`,
-                borderRadius: BORDER_RADIUS.md,
-                color: '#fca5a5',
-                fontSize: '14px',
-                marginBottom: SPACING.lg,
-              }}
-            >
-              {error}
+          {/* Input Card */}
+          <Card variant="default" style={{ maxWidth: '640px', margin: '0 auto' }}>
+            {/* Venue Name */}
+            <div style={{ marginBottom: SPACING.lg }}>
+              <Input
+                label="Venue Name"
+                placeholder="e.g., Senso-ji Temple, Eiffel Tower"
+                value={venueName}
+                onChange={(e) => setVenueName(e.target.value)}
+                error={error && !venueName.trim() ? error : undefined}
+              />
             </div>
-          )}
 
-          {/* Submit Button */}
-          <Button
-            onClick={handleSynthesize}
-            variant="primary"
-            size="lg"
-            style={{ width: '100%', marginTop: SPACING.lg }}
+            {/* Photo Upload */}
+            <div style={{ marginBottom: SPACING.lg }}>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  color: THEME.gold.text,
+                  marginBottom: SPACING.sm,
+                  letterSpacing: '0.05em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                Moment {photos.length > 0 && <span style={{ opacity: 0.6 }}>({photos.length})</span>}
+              </label>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handlePhotoSelect}
+                style={{ display: 'none' }}
+              />
+
+              <Button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isProcessingPhotos}
+                variant="secondary"
+                style={{
+                  width: '100%',
+                  justifyContent: 'center',
+                  border: `2px dashed ${THEME.gold[300]}`,
+                  paddingTop: SPACING.xl,
+                  paddingBottom: SPACING.xl,
+                }}
+              >
+                {isProcessingPhotos ? '📸 Processing...' : `${photos.length === 0 ? '📷 Add Photos' : '📷 Add More'}`}
+              </Button>
+
+              {/* Photo Thumbnails */}
+              {photos.length > 0 && (
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))',
+                    gap: SPACING.md,
+                    marginTop: SPACING.lg,
+                  }}
+                >
+                  {photos.map((photo, index) => (
+                    <div
+                      key={index}
+                      style={{
+                        position: 'relative',
+                        aspectRatio: '1',
+                        borderRadius: BORDER_RADIUS.md,
+                        overflow: 'hidden',
+                        border: `1px solid ${THEME.gold[200]}`,
+                        backgroundColor: THEME.gold[50],
+                      }}
+                    >
+                      <img
+                        src={photo.previewUrl}
+                        alt={`Photo ${index + 1}`}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                        }}
+                      />
+                      <button
+                        onClick={() => handleRemovePhoto(index)}
+                        style={{
+                          position: 'absolute',
+                          top: SPACING.xs,
+                          right: SPACING.xs,
+                          background: 'rgba(220, 38, 38, 0.8)',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: '50%',
+                          width: '24px',
+                          height: '24px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '12px',
+                          fontWeight: 'bold',
+                        }}
+                        title="Remove photo"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <Divider />
+
+            {/* Voice Notes */}
+            <div style={{ marginBottom: SPACING.lg }}>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  color: THEME.gold.text,
+                  marginBottom: SPACING.sm,
+                  letterSpacing: '0.05em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                What You Felt
+              </label>
+              <textarea
+                value={voiceKeywords}
+                onChange={(e) => setVoiceKeywords(e.target.value)}
+                placeholder="Describe the moment, emotions, sensations in your own words..."
+                style={{
+                  width: '100%',
+                  minHeight: '100px',
+                  padding: SPACING.md,
+                  fontSize: '14px',
+                  border: `1px solid ${THEME.gold[300]}`,
+                  borderRadius: BORDER_RADIUS.md,
+                  background: 'transparent',
+                  color: THEME.gold.text,
+                  outline: 'none',
+                  fontFamily: 'inherit',
+                  resize: 'vertical',
+                }}
+              />
+              <p
+                style={{
+                  fontSize: '12px',
+                  color: THEME.gold[600],
+                  marginTop: SPACING.sm,
+                }}
+              >
+                💭 Your notes stay on device. Used to enhance emotional synthesis.
+              </p>
+            </div>
+
+            {/* Sentiment */}
+            <div style={{ marginBottom: SPACING.lg }}>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  color: THEME.gold.text,
+                  marginBottom: SPACING.sm,
+                  letterSpacing: '0.05em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                Emotional Intensity: {Math.round(voiceSentiment * 100)}%
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.1"
+                value={voiceSentiment}
+                onChange={(e) => setVoiceSentiment(parseFloat(e.target.value))}
+                style={{
+                  width: '100%',
+                  height: '6px',
+                  borderRadius: BORDER_RADIUS.lg,
+                  background: `linear-gradient(to right, ${THEME.gold[200]}, ${THEME.green[500]})`,
+                  outline: 'none',
+                  WebkitAppearance: 'none',
+                }}
+              />
+            </div>
+
+            {/* Error Message */}
+            {error && (
+              <div
+                style={{
+                  padding: SPACING.lg,
+                  background: 'rgba(220, 38, 38, 0.1)',
+                  border: `1px solid rgba(220, 38, 38, 0.5)`,
+                  borderRadius: BORDER_RADIUS.md,
+                  color: '#fca5a5',
+                  fontSize: '14px',
+                  marginBottom: SPACING.lg,
+                }}
+              >
+                {error}
+              </div>
+            )}
+
+            {/* Submit Button */}
+            <Button
+              onClick={handleSynthesize}
+              variant="primary"
+              size="lg"
+              style={{ width: '100%', marginTop: SPACING.lg }}
+            >
+              ✨ Synthesize Memory
+            </Button>
+          </Card>
+
+          {/* Footer text */}
+          <div
+            style={{
+              textAlign: 'center',
+              marginTop: '80px',
+              paddingBottom: '40px',
+              fontSize: '12px',
+              color: THEME.gold[600],
+              letterSpacing: '0.1em',
+            }}
           >
-            ✨ Create Memory
-          </Button>
-        </Card>
-      )}
+            Part of the Quinn Travel Platform
+          </div>
+        </main>
+      ) : null}
 
       {/* Processing State */}
       {state === 'processing' && (
-        <Card variant="highlight">
-          <LoadingState message="Synthesizing your moment into a memory..." />
-        </Card>
+        <main className="results-container" style={{ position: 'relative', zIndex: 10 }}>
+          <Card variant="highlight">
+            <LoadingState message="Synthesizing your moment into a memory..." />
+          </Card>
+        </main>
       )}
 
-      {/* Success State - Results Display */}
+      {/* Success State */}
       {state === 'success' && moment && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.lg }}>
-          {/* Primary Emotion */}
-          <Card variant="success">
+        <main className="results-container" style={{ position: 'relative', zIndex: 10 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.lg }}>
+            {/* Primary Emotion */}
+            <Card variant="success">
+              <div
+                style={{
+                  textAlign: 'center',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: SPACING.md,
+                }}
+              >
+                <h2
+                  style={{
+                    fontSize: '40px',
+                    fontWeight: 700,
+                    color: THEME.green.text,
+                    marginBottom: SPACING.sm,
+                  }}
+                >
+                  {moment.primary_emotion}
+                </h2>
+                <div style={{ display: 'flex', gap: SPACING.sm, flexWrap: 'wrap', justifyContent: 'center' }}>
+                  <Pill color="green">Transcendence Score: {moment.transcendence_score.toFixed(1)}/10</Pill>
+                </div>
+              </div>
+            </Card>
+
+            {/* Emotional Arc */}
+            <Card>
+              <h3
+                style={{
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  color: THEME.gold.text,
+                  marginBottom: SPACING.lg,
+                  letterSpacing: '0.05em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                Emotional Arc
+              </h3>
+              <div style={{ display: 'flex', gap: SPACING.sm, flexWrap: 'wrap' }}>
+                {moment.emotional_arc.map((emotion, i) => (
+                  <EmotionTag key={i} emotion={emotion} />
+                ))}
+              </div>
+            </Card>
+
+            {/* Narrative */}
+            <Card>
+              <h3
+                style={{
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  color: THEME.gold.text,
+                  marginBottom: SPACING.lg,
+                  letterSpacing: '0.05em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                Your Story
+              </h3>
+              <p
+                style={{
+                  fontSize: '15px',
+                  lineHeight: '1.7',
+                  color: THEME.gold[500],
+                  fontStyle: 'italic',
+                }}
+              >
+                "{moment.narrative}"
+              </p>
+            </Card>
+
+            {/* Memory Anchors */}
+            {moment.memory_anchors && moment.memory_anchors.length > 0 && (
+              <Card>
+                <h3
+                  style={{
+                    fontSize: '16px',
+                    fontWeight: 600,
+                    color: THEME.gold.text,
+                    marginBottom: SPACING.lg,
+                    letterSpacing: '0.05em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  Memory Anchors
+                </h3>
+                <ul
+                  style={{
+                    listStyle: 'none',
+                    padding: 0,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: SPACING.md,
+                  }}
+                >
+                  {moment.memory_anchors.map((anchor, i) => (
+                    <li
+                      key={i}
+                      style={{
+                        paddingLeft: SPACING.lg,
+                        position: 'relative',
+                        color: THEME.gold[500],
+                        fontSize: '14px',
+                      }}
+                    >
+                      <span
+                        style={{
+                          position: 'absolute',
+                          left: 0,
+                          color: THEME.green[500],
+                          fontWeight: 'bold',
+                        }}
+                      >
+                        •
+                      </span>
+                      {anchor}
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            )}
+
+            {/* Sensory Details */}
+            {moment.sensory_details && moment.sensory_details.length > 0 && (
+              <Card>
+                <h3
+                  style={{
+                    fontSize: '16px',
+                    fontWeight: 600,
+                    color: THEME.gold.text,
+                    marginBottom: SPACING.lg,
+                    letterSpacing: '0.05em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  Sensory Details
+                </h3>
+                <ul
+                  style={{
+                    listStyle: 'none',
+                    padding: 0,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: SPACING.md,
+                  }}
+                >
+                  {moment.sensory_details.map((detail, i) => (
+                    <li
+                      key={i}
+                      style={{
+                        paddingLeft: SPACING.lg,
+                        position: 'relative',
+                        color: THEME.gold[500],
+                        fontSize: '14px',
+                      }}
+                    >
+                      <span
+                        style={{
+                          position: 'absolute',
+                          left: 0,
+                          color: THEME.green[500],
+                          fontWeight: 'bold',
+                        }}
+                      >
+                        ◆
+                      </span>
+                      {detail}
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            )}
+
+            {/* Actions */}
+            <div
+              style={{
+                display: 'flex',
+                gap: SPACING.lg,
+                marginTop: SPACING.xl,
+              }}
+            >
+              <Button onClick={handleReset} variant="secondary" style={{ flex: 1 }}>
+                Create Another Memory
+              </Button>
+            </div>
+
+            {/* Footer */}
             <div
               style={{
                 textAlign: 'center',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: SPACING.md,
+                marginTop: SPACING.xxl,
+                paddingBottom: SPACING.xl,
+                fontSize: '12px',
+                color: THEME.gold[600],
+                letterSpacing: '0.1em',
               }}
             >
-              <h2
-                style={{
-                  fontSize: '32px',
-                  fontWeight: 700,
-                  color: THEME.green.text,
-                  marginBottom: SPACING.sm,
-                }}
-              >
-                {moment.primary_emotion}
-              </h2>
-              <div style={{ display: 'flex', gap: SPACING.sm, flexWrap: 'wrap', justifyContent: 'center' }}>
-                <Pill color="green">Transcendence Score: {moment.transcendence_score.toFixed(1)}/10</Pill>
-              </div>
+              Part of the Quinn Travel Platform
             </div>
-          </Card>
-
-          {/* Emotional Arc */}
-          <Card>
-            <h3
-              style={{
-                fontSize: '16px',
-                fontWeight: 600,
-                color: THEME.gold.text,
-                marginBottom: SPACING.lg,
-              }}
-            >
-              Emotional Arc
-            </h3>
-            <div style={{ display: 'flex', gap: SPACING.sm, flexWrap: 'wrap' }}>
-              {moment.emotional_arc.map((emotion, i) => (
-                <EmotionTag key={i} emotion={emotion} />
-              ))}
-            </div>
-          </Card>
-
-          {/* Narrative */}
-          <Card>
-            <h3
-              style={{
-                fontSize: '16px',
-                fontWeight: 600,
-                color: THEME.gold.text,
-                marginBottom: SPACING.lg,
-              }}
-            >
-              Your Story
-            </h3>
-            <p
-              style={{
-                fontSize: '15px',
-                lineHeight: '1.6',
-                color: THEME.gold[500],
-                fontStyle: 'italic',
-              }}
-            >
-              "{moment.narrative}"
-            </p>
-          </Card>
-
-          {/* Memory Anchors */}
-          {moment.memory_anchors && moment.memory_anchors.length > 0 && (
-            <Card>
-              <h3
-                style={{
-                  fontSize: '16px',
-                  fontWeight: 600,
-                  color: THEME.gold.text,
-                  marginBottom: SPACING.lg,
-                }}
-              >
-                Memory Anchors
-              </h3>
-              <ul
-                style={{
-                  listStyle: 'none',
-                  padding: 0,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: SPACING.md,
-                }}
-              >
-                {moment.memory_anchors.map((anchor, i) => (
-                  <li
-                    key={i}
-                    style={{
-                      paddingLeft: SPACING.lg,
-                      position: 'relative',
-                      color: THEME.gold[500],
-                      fontSize: '14px',
-                    }}
-                  >
-                    <span
-                      style={{
-                        position: 'absolute',
-                        left: 0,
-                        color: THEME.green[500],
-                        fontWeight: 'bold',
-                      }}
-                    >
-                      •
-                    </span>
-                    {anchor}
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          )}
-
-          {/* Sensory Details */}
-          {moment.sensory_details && moment.sensory_details.length > 0 && (
-            <Card>
-              <h3
-                style={{
-                  fontSize: '16px',
-                  fontWeight: 600,
-                  color: THEME.gold.text,
-                  marginBottom: SPACING.lg,
-                }}
-              >
-                Sensory Details
-              </h3>
-              <ul
-                style={{
-                  listStyle: 'none',
-                  padding: 0,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: SPACING.md,
-                }}
-              >
-                {moment.sensory_details.map((detail, i) => (
-                  <li
-                    key={i}
-                    style={{
-                      paddingLeft: SPACING.lg,
-                      position: 'relative',
-                      color: THEME.gold[500],
-                      fontSize: '14px',
-                    }}
-                  >
-                    <span
-                      style={{
-                        position: 'absolute',
-                        left: 0,
-                        color: THEME.green[500],
-                        fontWeight: 'bold',
-                      }}
-                    >
-                      ◆
-                    </span>
-                    {detail}
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          )}
-
-          {/* Actions */}
-          <div
-            style={{
-              display: 'flex',
-              gap: SPACING.lg,
-              marginTop: SPACING.xl,
-            }}
-          >
-            <Button onClick={handleReset} variant="secondary" style={{ flex: 1 }}>
-              Create Another Memory
-            </Button>
           </div>
-        </div>
+        </main>
       )}
 
       {/* Error State */}
       {state === 'error' && (
-        <Card variant="default">
-          <div style={{ textAlign: 'center' }}>
-            <h2
-              style={{
-                fontSize: '20px',
-                fontWeight: 600,
-                color: '#fca5a5',
-                marginBottom: SPACING.lg,
-              }}
-            >
-              Something went wrong
-            </h2>
-            <p
-              style={{
-                color: THEME.gold[600],
-                marginBottom: SPACING.lg,
-                fontSize: '14px',
-              }}
-            >
-              {error}
-            </p>
-            <Button onClick={handleReset} variant="primary">
-              Try Again
-            </Button>
-          </div>
-        </Card>
+        <main className="results-container" style={{ position: 'relative', zIndex: 10 }}>
+          <Card variant="default">
+            <div style={{ textAlign: 'center' }}>
+              <h2
+                style={{
+                  fontSize: '20px',
+                  fontWeight: 600,
+                  color: '#fca5a5',
+                  marginBottom: SPACING.lg,
+                }}
+              >
+                Something went wrong
+              </h2>
+              <p
+                style={{
+                  color: THEME.gold[600],
+                  marginBottom: SPACING.lg,
+                  fontSize: '14px',
+                }}
+              >
+                {error}
+              </p>
+              <Button onClick={handleReset} variant="primary">
+                Try Again
+              </Button>
+            </div>
+          </Card>
+        </main>
       )}
     </div>
   );
