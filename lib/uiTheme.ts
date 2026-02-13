@@ -19,7 +19,7 @@ export const THEME = {
     500: 'rgba(90, 138, 106, 0.5)',
     text: 'rgba(90, 138, 106, 0.9)',
   },
-  background: '#0a0a0a',
+  background: 'linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 50%, #0f0f1a 100%)',
   text: {
     primary: '#e8e6e3',
     secondary: 'rgba(200, 180, 160, 0.6)',

@@ -319,6 +319,20 @@ export default function SensoryAgentUI({ onMomentCreated }: SensoryAgentUIProps)
 
   return (
     <div style={{ position: 'relative', minHeight: '100vh', background: THEME.background }}>
+      {/* Radial overlay glow (atmospheric depth) */}
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'radial-gradient(ellipse at 30% 20%, rgba(139, 115, 85, 0.08) 0%, transparent 50%)',
+          pointerEvents: 'none',
+          zIndex: 0,
+        }}
+      />
+
       {/* Ambient particles */}
       <Particles />
 
@@ -335,7 +349,7 @@ export default function SensoryAgentUI({ onMomentCreated }: SensoryAgentUIProps)
       >
         <div
           style={{
-            fontSize: '18px',
+            fontSize: '20px',
             fontWeight: 300,
             letterSpacing: '0.3em',
             textTransform: 'uppercase',
@@ -370,7 +384,7 @@ export default function SensoryAgentUI({ onMomentCreated }: SensoryAgentUIProps)
             </h1>
             <p
               style={{
-                fontSize: '16px',
+                fontSize: '18px',
                 fontWeight: 300,
                 color: THEME.gold[600],
                 maxWidth: '520px',
