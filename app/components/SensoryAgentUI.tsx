@@ -114,15 +114,321 @@ async function extractExifData(file: File): Promise<{
   });
 }
 
-async function analyzeImageLocally(_file: File): Promise<ExtractedPhotoData['localAnalysis']> {
+// =============================================================================
+// Helper: Calculate dominant hue (0-360)
+// =============================================================================
+function calculateDominantHue(pixels: Uint8ClampedArray): number {
+  const hueCounts: Record<number, number> = {};
+
+  for (let i = 0; i < pixels.length; i += 4) {
+    const r = pixels[i] / 255;
+    const g = pixels[i + 1] / 255;
+    const b = pixels[i + 2] / 255;
+
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const delta = max - min;
+
+    if (delta === 0) continue;
+
+    let hue = 0;
+    if (max === r) {
+      hue = ((g - b) / delta) % 6;
+    } else if (max === g) {
+      hue = (b - r) / delta + 2;
+    } else {
+      hue = (r - g) / delta + 4;
+    }
+
+    hue = Math.round(hue * 60);
+    if (hue < 0) hue += 360;
+
+    const hueBucket = Math.floor(hue / 30) * 30;
+    hueCounts[hueBucket] = (hueCounts[hueBucket] || 0) + 1;
+  }
+
+  let maxCount = 0;
+  let dominantHue = 0;
+  for (const [hue, count] of Object.entries(hueCounts)) {
+    if (count > maxCount) {
+      maxCount = count;
+      dominantHue = parseInt(hue);
+    }
+  }
+
+  return dominantHue;
+}
+
+// =============================================================================
+// Helper: Classify lighting from brightness
+// =============================================================================
+function classifyLighting(brightness: number): 'golden_hour' | 'bright' | 'overcast' | 'night' | null {
+  if (brightness > 200) return 'bright';
+  if (brightness > 150) return 'golden_hour';
+  if (brightness > 100) return 'overcast';
+  if (brightness <= 100) return 'night';
+  return null;
+}
+
+// =============================================================================
+// Helper: Classify energy from saturation and brightness
+// =============================================================================
+function classifyEnergy(saturation: number, brightness: number): 'tranquil' | 'calm' | 'lively' | 'energetic' | 'chaotic' | null {
+  const energyScore = (saturation * 255 + brightness) / 2;
+
+  if (energyScore > 200) return 'energetic';
+  if (energyScore > 160) return 'lively';
+  if (energyScore > 120) return 'calm';
+  return 'tranquil';
+}
+
+// =============================================================================
+// Helper: Infer basic emotion from visual characteristics
+// =============================================================================
+function inferEmotionFromVisuals({ brightness, saturation, hue }: {
+  brightness: number;
+  saturation: number;
+  hue: number;
+}): 'joy' | 'serenity' | 'awe' | 'nostalgia' | null {
+  // Bright + saturated + warm hues (red/orange/yellow) → joy
+  if (brightness > 180 && saturation > 0.5 && hue >= 0 && hue <= 60) {
+    return 'joy';
+  }
+
+  // Moderate brightness + blue/green hues → serenity
+  if (brightness > 120 && brightness < 180 && hue >= 180 && hue <= 270) {
+    return 'serenity';
+  }
+
+  // High brightness + vivid colors → awe
+  if (brightness > 200 && saturation > 0.6) {
+    return 'awe';
+  }
+
+  // Desaturated + warm tones → nostalgia
+  if (saturation < 0.3 && hue >= 0 && hue <= 60) {
+    return 'nostalgia';
+  }
+
+  return null;
+}
+
+// =============================================================================
+// Photo Emotion Detection
+// =============================================================================
+async function analyzeImageLocally(file: File): Promise<ExtractedPhotoData['localAnalysis']> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d')!;
+
+    img.onload = () => {
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
+
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const pixels = imageData.data;
+
+      // 1. Brightness analysis
+      let totalBrightness = 0;
+      for (let i = 0; i < pixels.length; i += 4) {
+        const r = pixels[i];
+        const g = pixels[i + 1];
+        const b = pixels[i + 2];
+        const brightness = (r + g + b) / 3;
+        totalBrightness += brightness;
+      }
+      const avgBrightness = totalBrightness / (pixels.length / 4);
+
+      // 2. Color saturation analysis
+      let totalSaturation = 0;
+      for (let i = 0; i < pixels.length; i += 4) {
+        const r = pixels[i];
+        const g = pixels[i + 1];
+        const b = pixels[i + 2];
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        const saturation = max === 0 ? 0 : (max - min) / max;
+        totalSaturation += saturation;
+      }
+      const avgSaturation = totalSaturation / (pixels.length / 4);
+
+      // 3. Dominant color hue
+      const dominantHue = calculateDominantHue(pixels);
+
+      // 4. Infer emotion from visual cues
+      const emotion = inferEmotionFromVisuals({
+        brightness: avgBrightness,
+        saturation: avgSaturation,
+        hue: dominantHue,
+      });
+
+      resolve({
+        scene_type: null,
+        lighting: classifyLighting(avgBrightness),
+        indoor_outdoor: null,
+        face_count: 0,
+        crowd_level: null,
+        energy_level: classifyEnergy(avgSaturation, avgBrightness),
+        basic_emotion: emotion,
+      });
+    };
+
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+// =============================================================================
+// Keyword Sentiment Analysis
+// =============================================================================
+function analyzeKeywordSentiment(keywords: string): number {
+  const words = keywords.toLowerCase().split(/[,\s]+/).filter(Boolean);
+
+  const positiveWords = new Set([
+    'amazing', 'beautiful', 'wonderful', 'joy', 'happy', 'excited', 'love',
+    'dream', 'perfect', 'awesome', 'incredible', 'fantastic', 'peaceful',
+    'serene', 'transcendent', 'magical', 'stunning', 'breathtaking',
+  ]);
+
+  const negativeWords = new Set([
+    'sad', 'disappointed', 'boring', 'crowded', 'rushed', 'stressful',
+    'tired', 'frustrated', 'difficult', 'overwhelming', 'anxious',
+  ]);
+
+  const veryPositiveWords = new Set([
+    'ecstatic', 'euphoric', 'blissful', 'extraordinary', 'unforgettable',
+    'once-in-a-lifetime', 'mind-blowing', 'phenomenal',
+  ]);
+
+  const moderateWords = new Set([
+    'nice', 'good', 'pleasant', 'okay', 'fine', 'decent', 'alright',
+  ]);
+
+  let sentimentScore = 0.5;
+  let wordCount = 0;
+
+  for (const word of words) {
+    if (veryPositiveWords.has(word)) {
+      sentimentScore += 0.15;
+      wordCount++;
+    } else if (positiveWords.has(word)) {
+      sentimentScore += 0.1;
+      wordCount++;
+    } else if (moderateWords.has(word)) {
+      sentimentScore += 0.05;
+      wordCount++;
+    } else if (negativeWords.has(word)) {
+      sentimentScore -= 0.1;
+      wordCount++;
+    }
+  }
+
+  return Math.max(0, Math.min(1, sentimentScore));
+}
+
+// =============================================================================
+// Combined Sentiment Recommendation
+// =============================================================================
+function calculateRecommendedSentiment(
+  photos: ExtractedPhotoData[],
+  keywords: string
+): { value: number; confidence: 'high' | 'medium' | 'low'; sources: string[] } {
+  const sources: string[] = [];
+  let totalSentiment = 0;
+  let componentCount = 0;
+
+  if (photos.length > 0) {
+    const photoEmotions = photos
+      .map(p => p.localAnalysis.basic_emotion)
+      .filter(Boolean);
+
+    if (photoEmotions.length > 0) {
+      const emotionScores = photoEmotions.map(emotion => {
+        switch (emotion) {
+          case 'joy': return 0.85;
+          case 'awe': return 0.75;
+          case 'serenity': return 0.55;
+          case 'nostalgia': return 0.45;
+          default: return 0.5;
+        }
+      });
+
+      const avgPhotoSentiment = emotionScores.reduce((a, b) => a + b, 0) / emotionScores.length;
+      totalSentiment += avgPhotoSentiment;
+      componentCount++;
+      sources.push('photos');
+    }
+  }
+
+  if (keywords.trim()) {
+    const keywordSentiment = analyzeKeywordSentiment(keywords);
+    totalSentiment += keywordSentiment;
+    componentCount++;
+    sources.push('keywords');
+  }
+
+  const recommendedValue = componentCount > 0
+    ? totalSentiment / componentCount
+    : 0.5;
+
+  const confidence = componentCount >= 2
+    ? 'high'
+    : componentCount === 1
+    ? 'medium'
+    : 'low';
+
   return {
-    scene_type: null,
-    lighting: null,
-    indoor_outdoor: null,
-    face_count: 0,
-    crowd_level: null,
-    energy_level: null,
-    basic_emotion: null,
+    value: Math.max(0, Math.min(1, recommendedValue)),
+    confidence,
+    sources,
+  };
+}
+
+// =============================================================================
+// Intensity Guidance
+// =============================================================================
+function getIntensityGuidance(intensity: number): {
+  label: string;
+  example: string;
+  tone: string;
+} {
+  if (intensity >= 0.8) {
+    return {
+      label: 'Very High Intensity',
+      example: 'Perfect for: Skydiving, proposal, dream destination, once-in-a-lifetime moment',
+      tone: 'Your story will be told in an exhilarating, vivid voice with dramatic language',
+    };
+  }
+
+  if (intensity >= 0.6) {
+    return {
+      label: 'High Intensity',
+      example: 'Great for: Exciting discovery, amazing meal, breathtaking view',
+      tone: 'Your story will be enthusiastic and expressive',
+    };
+  }
+
+  if (intensity >= 0.4) {
+    return {
+      label: 'Moderate Intensity',
+      example: 'Ideal for: Pleasant experience, nice walk, enjoyable sightseeing',
+      tone: 'Your story will be warm and appreciative',
+    };
+  }
+
+  if (intensity >= 0.2) {
+    return {
+      label: 'Low Intensity',
+      example: 'Good for: Quiet reflection, peaceful moment, gentle observation',
+      tone: 'Your story will be calm and contemplative',
+    };
+  }
+
+  return {
+    label: 'Very Low Intensity',
+    example: 'Appropriate for: Somber memorial, quiet contemplation, subtle moment',
+    tone: 'Your story will be gentle and reflective',
   };
 }
 
@@ -147,6 +453,22 @@ export default function SensoryAgentUI({ onMomentCreated }: SensoryAgentUIProps)
   const [voiceSentiment, setVoiceSentiment] = useState(0.5);
   const [voiceKeywords, setVoiceKeywords] = useState('');
   const [extractedCoordinates, setExtractedCoordinates] = useState<{ lat: number; lon: number } | null>(null);
+  const [recommendedSentiment, setRecommendedSentiment] = useState<{
+    value: number;
+    confidence: 'high' | 'medium' | 'low';
+    sources: string[];
+  } | null>(null);
+
+  // Recalculate sentiment recommendation when photos or keywords change
+  useEffect(() => {
+    const recommendation = calculateRecommendedSentiment(photos, voiceKeywords);
+    setRecommendedSentiment(recommendation);
+
+    // Auto-populate slider only if high/medium confidence
+    if (recommendation.confidence !== 'low') {
+      setVoiceSentiment(recommendation.value);
+    }
+  }, [photos, voiceKeywords]);
 
   // Handle photo selection
   const handlePhotoSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -558,6 +880,20 @@ export default function SensoryAgentUI({ onMomentCreated }: SensoryAgentUIProps)
 
             {/* Sentiment */}
             <div style={{ marginBottom: SPACING.lg }}>
+              {/* Recommendation Badge */}
+              {recommendedSentiment && recommendedSentiment.confidence !== 'low' && (
+                <div style={{ marginBottom: SPACING.md, display: 'flex', alignItems: 'center', gap: SPACING.sm }}>
+                  <Pill color="green" icon="✨">
+                    Recommended: {Math.round(recommendedSentiment.value * 100)}%
+                  </Pill>
+                  <span style={{ fontSize: '11px', color: THEME.gold[600] }}>
+                    Based on {recommendedSentiment.sources.join(' + ')}
+                    {recommendedSentiment.confidence === 'high' && ' (high confidence)'}
+                  </span>
+                </div>
+              )}
+
+              {/* Slider Label */}
               <label
                 style={{
                   display: 'block',
@@ -571,11 +907,13 @@ export default function SensoryAgentUI({ onMomentCreated }: SensoryAgentUIProps)
               >
                 Emotional Intensity: {Math.round(voiceSentiment * 100)}%
               </label>
+
+              {/* Slider */}
               <input
                 type="range"
                 min="0"
                 max="1"
-                step="0.1"
+                step="0.05"
                 value={voiceSentiment}
                 onChange={(e) => setVoiceSentiment(parseFloat(e.target.value))}
                 style={{
@@ -587,6 +925,51 @@ export default function SensoryAgentUI({ onMomentCreated }: SensoryAgentUIProps)
                   WebkitAppearance: 'none',
                 }}
               />
+
+              {/* Guidance Card */}
+              <div
+                style={{
+                  marginTop: SPACING.md,
+                  padding: SPACING.md,
+                  background: THEME.gold[50],
+                  borderRadius: BORDER_RADIUS.md,
+                  border: `1px solid ${THEME.gold[200]}`,
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: THEME.gold.text,
+                    marginBottom: SPACING.xs,
+                    margin: 0,
+                  }}
+                >
+                  {getIntensityGuidance(voiceSentiment).label}
+                </p>
+                <p
+                  style={{
+                    fontSize: '11px',
+                    color: THEME.gold[600],
+                    marginBottom: SPACING.xs,
+                    lineHeight: 1.5,
+                    margin: `${SPACING.xs} 0`,
+                  }}
+                >
+                  <strong>Best for:</strong> {getIntensityGuidance(voiceSentiment).example}
+                </p>
+                <p
+                  style={{
+                    fontSize: '11px',
+                    color: THEME.gold[500],
+                    fontStyle: 'italic',
+                    lineHeight: 1.5,
+                    margin: `${SPACING.xs} 0 0 0`,
+                  }}
+                >
+                  {getIntensityGuidance(voiceSentiment).tone}
+                </p>
+              </div>
             </div>
 
             {/* Error Message */}
