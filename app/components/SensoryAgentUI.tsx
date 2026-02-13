@@ -333,24 +333,18 @@ function analyzeKeywordSentiment(keywords: string): number {
   ]);
 
   let sentimentScore = 0.5;
-  let wordCount = 0;
 
   for (const word of words) {
     if (veryPositiveWords.has(word)) {
       sentimentScore += 0.15;
-      wordCount++;
     } else if (positiveWords.has(word)) {
       sentimentScore += 0.1;
-      wordCount++;
     } else if (moderateWords.has(word)) {
       sentimentScore += 0.05;
-      wordCount++;
     } else if (negativeWords.has(word)) {
       sentimentScore -= 0.1;
-      wordCount++;
     } else if (veryNegativeWords.has(word)) {
       sentimentScore -= 0.15;
-      wordCount++;
     }
   }
 
