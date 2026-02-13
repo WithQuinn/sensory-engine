@@ -674,7 +674,7 @@ export default function SensoryAgentUI({ onMomentCreated }: SensoryAgentUIProps)
                 Emotional Arc
               </h3>
               <div style={{ display: 'flex', gap: SPACING.sm, flexWrap: 'wrap' }}>
-                {moment.emotional_arc.map((emotion, i) => (
+                {moment.emotion_tags.map((emotion, i) => (
                   <EmotionTag key={i} emotion={emotion} />
                 ))}
               </div>
@@ -702,12 +702,12 @@ export default function SensoryAgentUI({ onMomentCreated }: SensoryAgentUIProps)
                   fontStyle: 'italic',
                 }}
               >
-                "{moment.narrative}"
+                "{moment.narratives.full}"
               </p>
             </Card>
 
             {/* Memory Anchors */}
-            {moment.memory_anchors && moment.memory_anchors.length > 0 && (
+            {moment.memory_anchors && (
               <Card>
                 <h3
                   style={{
@@ -730,9 +730,8 @@ export default function SensoryAgentUI({ onMomentCreated }: SensoryAgentUIProps)
                     gap: SPACING.md,
                   }}
                 >
-                  {moment.memory_anchors.map((anchor, i) => (
+                  {moment.memory_anchors.sensory_anchor && (
                     <li
-                      key={i}
                       style={{
                         paddingLeft: SPACING.lg,
                         position: 'relative',
@@ -750,15 +749,59 @@ export default function SensoryAgentUI({ onMomentCreated }: SensoryAgentUIProps)
                       >
                         •
                       </span>
-                      {anchor}
+                      {moment.memory_anchors.sensory_anchor}
                     </li>
-                  ))}
+                  )}
+                  {moment.memory_anchors.emotional_anchor && (
+                    <li
+                      style={{
+                        paddingLeft: SPACING.lg,
+                        position: 'relative',
+                        color: THEME.gold[500],
+                        fontSize: '14px',
+                      }}
+                    >
+                      <span
+                        style={{
+                          position: 'absolute',
+                          left: 0,
+                          color: THEME.green[500],
+                          fontWeight: 'bold',
+                        }}
+                      >
+                        •
+                      </span>
+                      {moment.memory_anchors.emotional_anchor}
+                    </li>
+                  )}
+                  {moment.memory_anchors.unexpected_anchor && (
+                    <li
+                      style={{
+                        paddingLeft: SPACING.lg,
+                        position: 'relative',
+                        color: THEME.gold[500],
+                        fontSize: '14px',
+                      }}
+                    >
+                      <span
+                        style={{
+                          position: 'absolute',
+                          left: 0,
+                          color: THEME.green[500],
+                          fontWeight: 'bold',
+                        }}
+                      >
+                        •
+                      </span>
+                      {moment.memory_anchors.unexpected_anchor}
+                    </li>
+                  )}
                 </ul>
               </Card>
             )}
 
             {/* Sensory Details */}
-            {moment.sensory_details && moment.sensory_details.length > 0 && (
+            {moment.sensory_details && (
               <Card>
                 <h3
                   style={{
@@ -781,9 +824,8 @@ export default function SensoryAgentUI({ onMomentCreated }: SensoryAgentUIProps)
                     gap: SPACING.md,
                   }}
                 >
-                  {moment.sensory_details.map((detail, i) => (
+                  {moment.sensory_details.visual && (
                     <li
-                      key={i}
                       style={{
                         paddingLeft: SPACING.lg,
                         position: 'relative',
@@ -801,9 +843,75 @@ export default function SensoryAgentUI({ onMomentCreated }: SensoryAgentUIProps)
                       >
                         ◆
                       </span>
-                      {detail}
+                      {moment.sensory_details.visual}
                     </li>
-                  ))}
+                  )}
+                  {moment.sensory_details.audio && (
+                    <li
+                      style={{
+                        paddingLeft: SPACING.lg,
+                        position: 'relative',
+                        color: THEME.gold[500],
+                        fontSize: '14px',
+                      }}
+                    >
+                      <span
+                        style={{
+                          position: 'absolute',
+                          left: 0,
+                          color: THEME.green[500],
+                          fontWeight: 'bold',
+                        }}
+                      >
+                        ◆
+                      </span>
+                      {moment.sensory_details.audio}
+                    </li>
+                  )}
+                  {moment.sensory_details.scent && (
+                    <li
+                      style={{
+                        paddingLeft: SPACING.lg,
+                        position: 'relative',
+                        color: THEME.gold[500],
+                        fontSize: '14px',
+                      }}
+                    >
+                      <span
+                        style={{
+                          position: 'absolute',
+                          left: 0,
+                          color: THEME.green[500],
+                          fontWeight: 'bold',
+                        }}
+                      >
+                        ◆
+                      </span>
+                      {moment.sensory_details.scent}
+                    </li>
+                  )}
+                  {moment.sensory_details.tactile && (
+                    <li
+                      style={{
+                        paddingLeft: SPACING.lg,
+                        position: 'relative',
+                        color: THEME.gold[500],
+                        fontSize: '14px',
+                      }}
+                    >
+                      <span
+                        style={{
+                          position: 'absolute',
+                          left: 0,
+                          color: THEME.green[500],
+                          fontWeight: 'bold',
+                        }}
+                      >
+                        ◆
+                      </span>
+                      {moment.sensory_details.tactile}
+                    </li>
+                  )}
                 </ul>
               </Card>
             )}
