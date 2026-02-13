@@ -392,7 +392,7 @@ export default function SensoryAgentUI({ onMomentCreated }: SensoryAgentUIProps)
                 lineHeight: 1.7,
               }}
             >
-              Upload photos, share what you felt, and let Claude synthesize your moment into an emotional narrative enriched with sensory details.
+              Upload photos, share what you felt, and let Quinn synthesize your moment into an emotional narrative enriched with sensory details.
             </p>
           </div>
 
