@@ -4,6 +4,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { trackEvent, getOrCreateSessionId } from '@/lib/telemetry';
 import { THEME, SPACING, BORDER_RADIUS } from '@/lib/uiTheme';
 import { Button, Card, Pill, Input, LoadingState, Divider, EmotionTag } from '@/lib/uiComponents';
+import NarrativeRatingPrompt from '@/app/components/NarrativeRatingPrompt';
 import type { MomentSense, SensoryInput, PhotoReference } from '@/lib/sensoryValidation';
 
 // =============================================================================
@@ -1449,6 +1450,9 @@ export default function SensoryAgentUI({ onMomentCreated }: SensoryAgentUIProps)
                 </ul>
               </Card>
             )}
+
+            {/* Rating Prompt */}
+            <NarrativeRatingPrompt momentId={moment.moment_id} />
 
             {/* Actions */}
             <div
