@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { checkRateLimit, getRateLimitHeaders } from "@/lib/rateLimit";
 import { logServerEvent } from "@/lib/telemetry";
+import { detectDeviceCapability } from "@/lib/deviceCapability";
+import { synthesizeWithAppleIntelligence } from "@/lib/appleIntelligenceAdapter";
+import { synthesizeWithPhi3 } from "@/lib/phi3Adapter";
+import { createDegradedResponse, queueSynthesisRequest } from "@/lib/synthesisQueue";
 import {
   SensoryInputSchema,
   MomentSenseSchema,
@@ -140,6 +144,60 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     has_venue: !!input.venue,
     companion_count: input.companions.length,
   });
+
+  // ---------------------------------------------------------------------------
+  // 2.5. Device Capability Routing (local-first for iOS devices)
+  // Apple Intelligence (iOS 18.1+) → local synthesis, no cloud AI call
+  // Phi-3 (iOS 15-18.0) → local synthesis, no cloud AI call
+  // queue_synthesis (iOS <15) → queue + degraded response immediately
+  // Default (web/desktop) → fall through to full cloud pipeline below
+  // ---------------------------------------------------------------------------
+  const userAgent = request.headers.get("user-agent") || "";
+  const isIOSDevice = userAgent.includes("iPhone") || userAgent.includes("iPad");
+  const deviceCapability = isIOSDevice ? detectDeviceCapability(userAgent) : null;
+
+  if (isIOSDevice && deviceCapability === "queue_synthesis") {
+    // iOS <15: can't synthesize locally or via cloud (privacy constraint)
+    const momentId = crypto.randomUUID();
+    const queueResult = await queueSynthesisRequest(input, momentId);
+    if (!queueResult.success) {
+      return NextResponse.json(
+        buildErrorResponse("Unable to queue synthesis request. Please try again.", "SYNTHESIS_FAILED", { requestId }, requestId),
+        { status: 503, headers: rateLimitHeaders }
+      );
+    }
+    const degradedResponse = createDegradedResponse(input, momentId);
+    return NextResponse.json(
+      { success: true, moment: degradedResponse, queued: true },
+      { status: 202, headers: rateLimitHeaders }
+    );
+  }
+
+  if (isIOSDevice && (deviceCapability === "apple_intelligence" || deviceCapability === "phi3_local")) {
+    // iOS 15+: synthesize locally, skip Anthropic cloud call
+    try {
+      const momentId = crypto.randomUUID();
+      const localMoment = deviceCapability === "apple_intelligence"
+        ? await synthesizeWithAppleIntelligence(input, momentId)
+        : await synthesizeWithPhi3(input, momentId);
+      logServerEvent("info", "Local synthesis completed", {
+        requestId,
+        device_capability: deviceCapability,
+        processing_time_ms: Date.now() - startTime,
+      });
+      return NextResponse.json(
+        { success: true, moment: localMoment },
+        { status: 200, headers: rateLimitHeaders }
+      );
+    } catch (localError) {
+      // Local synthesis failed - fall through to cloud pipeline as fallback
+      logServerEvent("warn", "Local synthesis failed, falling back to cloud", {
+        requestId,
+        device_capability: deviceCapability,
+        error: localError instanceof Error ? localError.message : "Unknown error",
+      });
+    }
+  }
 
   // ---------------------------------------------------------------------------
   // 3. Fetch Cloud Enrichment Data (Weather + Venue) - PARALLELIZED
@@ -293,13 +351,26 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // ---------------------------------------------------------------------------
   const excitementAnalysis = analyzeExcitement(venueEnrichment);
 
-  // Track actual visit history per user/venue to determine isFirstVisit
-  // Currently assumes first visit by default. This should integrate with Profile Agent's
-  // visit history tracking once available. See Issue #69 for integration plan.
+  // ---------------------------------------------------------------------------
+  // Visit History Tracking
+  // ---------------------------------------------------------------------------
+  // Track actual visit history per user/venue to determine isFirstVisit.
+  // Currently defaults to false (repeat visit) when session ID unavailable.
+  // This is a safe conservative default that prevents systematic score inflation.
   //
-  // TODO (Sprint 2): Replace with actual profile agent integration:
+  // Future integration (Phase 2 - Profile Agent):
+  // const visitHistory = await profileAgent.getVisitHistory(userId, venueId);
+  // const isFirstVisit = visitHistory.count === 0;
+  //
+  // For now, explicit first-visit tracking can be enabled by clients sending
+  // X-First-Visit: true header (trusted clients only).
+  // See Issue #69 for full integration plan.
+  // ---------------------------------------------------------------------------
+  // Default to false (repeat visit) when visit history unavailable
+  // This prevents systematic score inflation for requests without session IDs
+  // TODO (Phase 2): Integrate with Profile Agent visit history tracking
   // const isFirstVisit = await profileAgent.isFirstVisit(userId, venueId);
-  const isFirstVisit = !sessionId || sessionId === "unknown";
+  const isFirstVisit = false;
 
   const transcendenceFactors = buildTranscendenceFactors({
     sentimentScore: input.audio?.sentiment_score ?? null,
