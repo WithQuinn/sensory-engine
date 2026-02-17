@@ -319,9 +319,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
       const anthropic = new Anthropic({ apiKey: anthropicKey });
       const prompt = buildSynthesisPrompt(synthesisInput);
+      const claudeModel = process.env.CLAUDE_MODEL || "claude-sonnet-4-20250514";
+
+      logServerEvent("info", "Calling Claude for synthesis", {
+        requestId,
+        model: claudeModel,
+      });
 
       const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-20250514",
+        model: claudeModel,
         max_tokens: 2000,
         system: SENSORY_SYSTEM_PROMPT,
         messages: [{ role: "user", content: prompt }],
