@@ -13,6 +13,8 @@ dist/
 build/
 out/
 .next/
+*.tsbuildinfo
+next-env.d.ts
 
 # IDE
 .vscode/
@@ -44,3 +46,6 @@ Thumbs.db
 # Performance profiling
 *.prof
 isolate-*.log
+
+# GSD Planning (local-only)
+.planning/
