@@ -129,20 +129,23 @@ export function logError(
 }
 
 /**
- * PostHog event tracking (if available)
- * TODO: Integrate with PostHog when dashboard is configured
+ * PostHog event tracking (integrated with PostHog SDK)
  */
 export function trackEvent(
   eventName: string,
   properties?: Record<string, any>
 ): void {
-  // For now, just log it
+  // Always log to structured telemetry
   logServerEvent('info', `Event: ${eventName}`, properties);
 
-  // TODO: Send to PostHog
-  // if (process.env.POSTHOG_API_KEY) {
-  //   posthog.capture({ event: eventName, properties });
-  // }
+  // Send to PostHog (client-side only, no-ops if not configured)
+  if (typeof window !== 'undefined') {
+    import('@/lib/posthog').then(({ captureEvent }) => {
+      captureEvent(eventName, properties);
+    }).catch(() => {
+      // PostHog send failed silently — console log already captured above
+    });
+  }
 }
 
 /**
@@ -191,6 +194,13 @@ export function getOrCreateSessionId(): string {
   if (!sessionId) {
     sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     localStorage.setItem(key, sessionId);
+
+    // Identify user in PostHog for new sessions
+    if (typeof window !== 'undefined') {
+      import('@/lib/posthog').then(({ identifyUser }) => {
+        identifyUser(sessionId!);
+      }).catch(() => {});
+    }
   }
 
   return sessionId;
