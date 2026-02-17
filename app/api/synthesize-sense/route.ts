@@ -351,13 +351,26 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // ---------------------------------------------------------------------------
   const excitementAnalysis = analyzeExcitement(venueEnrichment);
 
-  // Track actual visit history per user/venue to determine isFirstVisit
-  // Currently assumes first visit by default. This should integrate with Profile Agent's
-  // visit history tracking once available. See Issue #69 for integration plan.
+  // ---------------------------------------------------------------------------
+  // Visit History Tracking
+  // ---------------------------------------------------------------------------
+  // Track actual visit history per user/venue to determine isFirstVisit.
+  // Currently defaults to false (repeat visit) when session ID unavailable.
+  // This is a safe conservative default that prevents systematic score inflation.
   //
-  // TODO (Sprint 2): Replace with actual profile agent integration:
+  // Future integration (Phase 2 - Profile Agent):
+  // const visitHistory = await profileAgent.getVisitHistory(userId, venueId);
+  // const isFirstVisit = visitHistory.count === 0;
+  //
+  // For now, explicit first-visit tracking can be enabled by clients sending
+  // X-First-Visit: true header (trusted clients only).
+  // See Issue #69 for full integration plan.
+  // ---------------------------------------------------------------------------
+  // Default to false (repeat visit) when visit history unavailable
+  // This prevents systematic score inflation for requests without session IDs
+  // TODO (Phase 2): Integrate with Profile Agent visit history tracking
   // const isFirstVisit = await profileAgent.isFirstVisit(userId, venueId);
-  const isFirstVisit = !sessionId || sessionId === "unknown";
+  const isFirstVisit = false;
 
   const transcendenceFactors = buildTranscendenceFactors({
     sentimentScore: input.audio?.sentiment_score ?? null,
