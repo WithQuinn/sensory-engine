@@ -6,8 +6,8 @@ Emotional synthesis from travel moments via photos, audio, and venue data. Part 
 
 The Sensory Engine transforms fragmented travel data into rich, emotional narratives. Given photos, audio notes, weather, venue history, and companions—Claude synthesizes immersive memories that capture the **feeling** of the moment.
 
-**Current Status:** MVP with Sprint 1 optimizations complete (venue enrichment)
-**Test Coverage:** 666+ automated tests
+**Current Status:** Phase 1 Production-Ready (68% complete, 0 blockers)
+**Test Coverage:** 318 automated tests (254 unit + 64 integration)
 **Performance:** ~50% faster venue enrichment (parallelize + cache + fallback)
 
 ## Quick Start
@@ -27,6 +27,22 @@ npm run test:e2e       # End-to-end scenarios
 # Run benchmark baselines
 npx tsx benchmarks/establish-baselines.ts
 ```
+
+## For Developers
+
+**New to the project?** Start with [`CLAUDE.md`](./CLAUDE.md) for comprehensive development guidelines:
+- Project structure and architecture
+- Definition of Done checklist
+- API development patterns (Zod validation)
+- Security and privacy requirements
+- Testing strategy and performance targets
+- Release notes guidelines
+
+**Quick Links:**
+- [`CLAUDE.md`](./CLAUDE.md) - Complete development guide
+- [`DEPLOYMENT.md`](./DEPLOYMENT.md) - Vercel deployment instructions
+- [`OPTIMIZATION-WORKFLOW.md`](./OPTIMIZATION-WORKFLOW.md) - Performance optimization methodology
+- [`CONTRIBUTING.md`](./CONTRIBUTING.md) - How to contribute
 
 ## Architecture
 
@@ -243,15 +259,34 @@ Main synthesis endpoint. Returns rich emotional narrative.
 
 ## Documentation
 
-- **User Story:** `docs/sensory-agent-user-story.md`
-- **Optimization Roadmap:** `docs/optimization-roadmap.md`
-- **Sprint 1 Guide:** `docs/sprint-1-venue-enrichment.md`
-- **Performance Metrics:** `docs/performance-metrics.md`
-- **Workflow:** `OPTIMIZATION-WORKFLOW.md`
+### Development Guides
+- **Development Guide:** [`CLAUDE.md`](./CLAUDE.md) - Complete project guide (start here!)
+- **Deployment Guide:** [`DEPLOYMENT.md`](./DEPLOYMENT.md) - Vercel deployment instructions
+- **Optimization Workflow:** [`OPTIMIZATION-WORKFLOW.md`](./OPTIMIZATION-WORKFLOW.md) - 5-day sprint cycle
+- **Contributing:** [`CONTRIBUTING.md`](./CONTRIBUTING.md) - Contribution guidelines
+
+### Product & Architecture
+- **User Story:** [`docs/sensory-agent-user-story.md`](./docs/sensory-agent-user-story.md) - Product requirements
+- **Epics:** [`docs/sensory-agent-epics.md`](./docs/sensory-agent-epics.md) - Feature breakdown
+- **Sprint 1 Guide:** [`docs/sprint-1-venue-enrichment.md`](./docs/sprint-1-venue-enrichment.md) - Venue optimization deep-dive
+
+### Technical Reference
+- **Performance Metrics:** [`PERFORMANCE-BASELINES.md`](./PERFORMANCE-BASELINES.md) - Baseline targets
+- **Error Classification:** [`ERROR-CLASSIFICATION.md`](./ERROR-CLASSIFICATION.md) - Error handling guide
+- **Telemetry Taxonomy:** [`TELEMETRY-TAXONOMY.md`](./TELEMETRY-TAXONOMY.md) - PostHog event definitions
+- **Phase 1 Roadmap:** [`PHASE-1-ROADMAP.md`](./PHASE-1-ROADMAP.md) - Production readiness tracker
 
 ## Contributing
 
-See `OPTIMIZATION-WORKFLOW.md` for commit message style guide:
+**Before contributing, read [`CLAUDE.md`](./CLAUDE.md)** for:
+- Definition of Done checklist
+- Security and privacy requirements
+- Testing requirements
+- API development patterns
+
+### Commit Message Format
+
+See [`OPTIMIZATION-WORKFLOW.md`](./OPTIMIZATION-WORKFLOW.md) for performance-focused commit style:
 
 ```
 Performance: [change description] ([% improvement], [old] → [new])
@@ -263,8 +298,13 @@ Benchmarks:
   Before: 1200ms
   After:  500ms
 
-Tests: ✅ All 666 tests passing
+Tests: ✅ All 318 tests passing
 ```
+
+**Pre-commit Hook:** All commits are automatically validated for:
+- ✅ No hardcoded secrets
+- ✅ Type check passing
+- ✅ All unit tests passing
 
 ## Related Repositories
 
@@ -279,4 +319,6 @@ Proprietary—Quinn Travel Platform (2026)
 
 Built with 💜 for emotional, sensory-rich travel memories.
 
-**Current Development:** Sprint 1 optimization complete. Ready for Sprint 2: Claude Synthesis.
+**Current Development:** Phase 1 complete (production-ready). Sprint 2 queued: Claude Synthesis optimization.
+
+**Getting Started?** Read [`CLAUDE.md`](./CLAUDE.md) first for complete development guidelines.
