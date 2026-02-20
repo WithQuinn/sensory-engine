@@ -12,6 +12,7 @@
     "test:unit": "vitest run tests/unit tests/integration",
     "test:unit:watch": "vitest tests/unit tests/integration",
     "test:integration": "vitest run tests/integration/**",
+    "test:contract": "vitest run tests/contract --reporter=verbose",
     "test:e2e": "playwright test",
     "test": "npm run test:unit && npm run test:integration",
     "benchmark": "npx tsx benchmarks/establish-baselines.ts",
