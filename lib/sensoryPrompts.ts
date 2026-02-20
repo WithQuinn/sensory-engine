@@ -128,11 +128,25 @@ You may NOT invent specific details not supported by metadata:
 - Direct quotes of what the user said (you don't have their words) ✗
 
 NARRATIVE VOICE:
-- Use the detected tone (awe, excitement, calm, etc.) as the baseline
-- Match their energy: excited → vivid descriptions, calm → peaceful prose
-- Include companion names/relationships naturally
-- Avoid travel clichés ("hidden gem", "breathtaking", "off the beaten path")
-- Be specific, not generic
+Match tone to primary emotion:
+- AWE: Reverent, expansive language. Focus on scale, history, significance
+- JOY: Bright, energetic. Short sentences. Vivid colors and movement
+- PEACE: Gentle, flowing. Longer sentences. Soft sensory details
+- EXCITEMENT: Quick pace. Specific moments. Dynamic action
+- GRATITUDE: Warm, reflective. Personal connections. Quiet appreciation
+- NOSTALGIA: Wistful, comparing then/now. Sensory triggers to memory
+- WONDER: Childlike curiosity. Questions. Fresh perspective
+
+Include companion names/relationships naturally:
+✓ "Max's hand in mine as we climbed the steps"
+✗ "I was with Max and he enjoyed it"
+
+AVOID CLICHÉS - Never use:
+"hidden gem", "off the beaten path", "breathtaking", "unforgettable", "bucket list", "once in a lifetime", "picture perfect", "magical", "stunning", "incredible journey"
+
+BE SPECIFIC - Show, don't tell:
+✓ "The monk's voice echoed across empty stone"
+✗ "The temple was very spiritual and peaceful"
 
 OUTPUT REQUIREMENTS:
 - Return ONLY valid JSON matching the specified schema
@@ -232,13 +246,13 @@ Generate a JSON object with this structure:
   "emotionConfidence": 0.0-1.0,
   "narratives": {
     "short": "15-25 word poetic summary",
-    "medium": "50-80 word narrative with key moments",
-    "full": "150-200 word complete story with all companions"
+    "medium": "2-3 sentences (50-80 words). Structure: HOOK (sensory opener) → MOMENT (what happened) → EMOTION (how it felt). Must work standalone without photo.",
+    "full": "150-200 words. Structure: SETTING (where/when/who) → BUILD (the experience unfolding) → PEAK (emotional high point) → REFLECTION (meaning/feeling). Include all companions naturally. Match tone to primary emotion."
   },
   "excitementHook": "One sentence that makes this place feel special (or null if not notable)",
   "memoryAnchors": {
-    "sensory": "Specific sensory detail to remember",
-    "emotional": "The emotional peak moment",
+    "sensory": "Specific sensory detail to remember (e.g., 'incense smoke curling through morning light', not 'nice smell')",
+    "emotional": "The emotional peak moment (specific, not generic)",
     "unexpected": "Something surprising (or null)",
     "shareable": "Best moment to share with others (or null)",
     "companion": "A companion-specific memory (or null if solo)"
@@ -246,7 +260,7 @@ Generate a JSON object with this structure:
   "companionExperiences": [
     {
       "nickname": "Name from companions list",
-      "reaction": "How they experienced this moment",
+      "reaction": "How they experienced this moment (specific, natural)",
       "wouldReturn": true/false/null
     }
   ],
@@ -256,6 +270,30 @@ Generate a JSON object with this structure:
     "sound": "Contextually appropriate sound (or null)"
   }
 }
+
+## Narrative Quality Guidelines
+
+MEDIUM NARRATIVE (2-3 sentences, 50-80 words):
+✓ GOOD: "Morning light filtered through the temple gates, casting long shadows across ancient stone. We walked slowly, breathing in incense and quiet—three strangers in a place that felt like home. That kind of peace you can't plan for."
+✗ BAD: "We visited the beautiful temple. It was amazing and breathtaking. The experience was unforgettable."
+
+Structure: Sensory hook → What happened → How it felt
+Must work standalone (reader doesn't see the photo)
+Specific details over generic adjectives
+Natural voice, not tour guide voice
+
+FULL NARRATIVE (150-200 words):
+Must have clear story arc: Setting → Build → Peak → Reflection
+Match tone to emotion (awe = reverent, joy = bright, peace = gentle)
+Weave companions in naturally (not "Mom enjoyed it, Max enjoyed it")
+Include time/place markers ("morning light", "after lunch", "as the sun set")
+Specific sensory moments that anchor the memory
+
+AVOID CLICHÉS:
+✗ "hidden gem", "off the beaten path", "breathtaking", "unforgettable"
+✗ "bucket list", "once in a lifetime", "picture perfect", "magical"
+✗ Generic superlatives without specific details
+✓ Specific observations that show, not tell
 
 Return ONLY the JSON object, no other text.`);
 
@@ -393,7 +431,7 @@ export function parseSynthesisResponse(response: string): SynthesisOutput | null
 // =============================================================================
 
 /**
- * Generate a basic fallback narrative when cloud synthesis fails
+ * Generate enhanced fallback narrative when cloud synthesis fails
  * Note: Uses only metadata - transcript text is not available here
  */
 export function generateFallbackNarrative(input: SynthesisInput): SynthesisOutput {
@@ -401,43 +439,59 @@ export function generateFallbackNarrative(input: SynthesisInput): SynthesisOutpu
   const va = input.voiceAnalysis;
 
   // Infer emotion from voice analysis metadata
-  const emotion = va?.sentimentScore !== null && va?.sentimentScore !== undefined
+  const primaryEmotion = va?.sentimentScore !== null && va?.sentimentScore !== undefined
     ? (va.sentimentScore > 0.5 ? 'joy' : va.sentimentScore < -0.3 ? 'reflection' : 'peace')
     : (va?.detectedTone || 'wonder');
 
-  const companionText = input.companions.length > 0
-    ? ` with ${input.companions.map(c => c.nickname || c.relationship).join(' and ')}`
-    : '';
+  // Build emotion-aware context
+  const lighting = input.photoAnalysis.lighting;
+  const timeOfDay = input.context.isGoldenHour ? 'golden hour' : extractTimeOfDay(input.context.localTime);
+  const venueCategory = input.venue?.category || 'place';
+  const crowdLevel = input.photoAnalysis.crowdLevel;
 
-  const weatherText = input.weather
-    ? ` ${input.weather.condition.toLowerCase()} day`
-    : '';
+  // Emotion-specific secondary emotions
+  const secondaryEmotions = getSecondaryEmotions(primaryEmotion, input);
 
-  const themeText = va?.theme ? ` A sense of ${va.theme}.` : '';
-  const shortNarrative = `A${weatherText} at ${venueName}${companionText}.`;
+  // Build companion references
+  const companions = input.companions;
+  const companionNames = companions.map(c => c.nickname || c.relationship);
+
+  // Generate emotion-appropriate narratives
+  const narratives = buildEmotionNarratives(
+    primaryEmotion,
+    venueName,
+    venueCategory,
+    companionNames,
+    lighting,
+    timeOfDay,
+    crowdLevel,
+    input.weather,
+    input.venue,
+    va
+  );
+
+  // Generate sensory anchors based on venue category
+  const sensoryAnchor = buildSensoryAnchor(venueCategory, lighting, input.venue);
+  const emotionalAnchor = buildEmotionalAnchor(primaryEmotion, companionNames.length > 0);
 
   return {
-    primaryEmotion: emotion,
-    secondaryEmotions: ['peace'],
-    emotionConfidence: 0.5,
-    narratives: {
-      short: shortNarrative.slice(0, 100),
-      medium: `We visited ${venueName}${companionText}.${themeText} A moment worth remembering.`,
-      full: `We visited ${venueName}${companionText}.${themeText} ${input.venue?.historicalSignificance || ''} A moment worth remembering.`.trim(),
-    },
+    primaryEmotion,
+    secondaryEmotions,
+    emotionConfidence: 0.6,
+    narratives,
     excitementHook: input.venue?.uniqueClaims[0] || null,
     memoryAnchors: {
-      sensory: input.photoAnalysis.lighting || 'The light',
-      emotional: 'Being here together',
+      sensory: sensoryAnchor,
+      emotional: emotionalAnchor,
       unexpected: null,
       shareable: null,
-      companion: input.companions.length > 0
-        ? `${input.companions[0].nickname || input.companions[0].relationship}'s experience`
+      companion: companions.length > 0
+        ? `${companionNames[0]}'s ${primaryEmotion === 'joy' ? 'delight' : primaryEmotion === 'awe' ? 'wonder' : 'experience'}`
         : null,
     },
-    companionExperiences: input.companions.map(c => ({
+    companionExperiences: companions.map(c => ({
       nickname: c.nickname || c.relationship,
-      reaction: 'Enjoyed the visit',
+      reaction: getCompanionReaction(primaryEmotion, c.age_group),
       wouldReturn: null,
     })),
     inferredSensory: {
@@ -446,4 +500,204 @@ export function generateFallbackNarrative(input: SynthesisInput): SynthesisOutpu
       sound: null,
     },
   };
+}
+
+// =============================================================================
+// FALLBACK NARRATIVE HELPERS
+// =============================================================================
+
+function extractTimeOfDay(localTime: string): string {
+  try {
+    const date = new Date(localTime);
+    const hour = date.getHours();
+    if (hour >= 5 && hour < 12) return 'morning';
+    if (hour >= 12 && hour < 17) return 'afternoon';
+    if (hour >= 17 && hour < 21) return 'evening';
+    return 'night';
+  } catch {
+    return 'day';
+  }
+}
+
+function getSecondaryEmotions(primaryEmotion: string, input: SynthesisInput): string[] {
+  const emotionMap: Record<string, string[]> = {
+    joy: ['excitement', 'gratitude'],
+    awe: ['wonder', 'peace'],
+    peace: ['contentment', 'gratitude'],
+    excitement: ['joy', 'wonder'],
+    gratitude: ['peace', 'contentment'],
+    nostalgia: ['peace', 'wonder'],
+    wonder: ['awe', 'curiosity'],
+    reflection: ['peace', 'nostalgia'],
+  };
+  return emotionMap[primaryEmotion] || ['peace', 'contentment'];
+}
+
+function buildEmotionNarratives(
+  emotion: string,
+  venueName: string,
+  venueCategory: string,
+  companionNames: string[],
+  lighting: string | null,
+  timeOfDay: string,
+  crowdLevel: string | null,
+  weather: SynthesisInput['weather'],
+  venue: SynthesisInput['venue'],
+  voiceAnalysis: SynthesisInput['voiceAnalysis']
+): { short: string; medium: string; full: string } {
+  const companionPhrase = companionNames.length > 0
+    ? companionNames.length === 1
+      ? ` with ${companionNames[0]}`
+      : ` with ${companionNames.slice(0, -1).join(', ')} and ${companionNames[companionNames.length - 1]}`
+    : '';
+
+  const weatherContext = weather
+    ? weather.condition.toLowerCase().includes('sun') || weather.condition.toLowerCase().includes('clear')
+      ? 'clear skies'
+      : weather.condition.toLowerCase()
+    : '';
+
+  const lightingContext = lighting === 'golden_hour'
+    ? 'golden light'
+    : lighting === 'night'
+    ? 'evening glow'
+    : lighting;
+
+  const crowdContext = crowdLevel === 'empty' || crowdLevel === 'sparse'
+    ? 'quiet and unhurried'
+    : crowdLevel === 'packed' || crowdLevel === 'busy'
+    ? 'bustling with energy'
+    : '';
+
+  // Emotion-specific openers and closers
+  const openers: Record<string, string> = {
+    awe: `${timeOfDay === 'morning' ? 'Morning' : timeOfDay === 'evening' ? 'Evening' : timeOfDay.charAt(0).toUpperCase() + timeOfDay.slice(1)} at ${venueName}`,
+    joy: `${weatherContext ? weatherContext + ' at' : 'At'} ${venueName}`,
+    peace: `${crowdContext ? 'A ' + crowdContext.split(' ')[0] + ' moment' : timeOfDay.charAt(0).toUpperCase() + timeOfDay.slice(1)} at ${venueName}`,
+    excitement: `${venueName}${companionPhrase}`,
+    gratitude: `${timeOfDay.charAt(0).toUpperCase() + timeOfDay.slice(1)} light at ${venueName}`,
+    nostalgia: `Returning to ${venueName}`,
+    wonder: `Discovering ${venueName}`,
+    reflection: `An afternoon at ${venueName}`,
+  };
+
+  const short = openers[emotion] || `${timeOfDay.charAt(0).toUpperCase() + timeOfDay.slice(1)} at ${venueName}`;
+
+  // Medium narrative (50-80 words, 2-3 sentences)
+  let medium = short + companionPhrase + '. ';
+
+  if (emotion === 'awe') {
+    const histContext = venue?.historicalSignificance || (venueCategory === 'landmark' ? 'The weight of history' : 'The weight of this place');
+    medium += `${histContext}. `;
+    medium += voiceAnalysis?.theme === 'fulfillment' ? 'A dream realized.' : 'Moments like these remind you what matters.';
+  } else if (emotion === 'joy') {
+    const lightAndContext = lightingContext ? lightingContext.charAt(0).toUpperCase() + lightingContext.slice(1) + ' and' : 'Everything';
+    medium += `${lightAndContext} ${crowdContext || 'alive with possibility'}. `;
+
+    if (companionNames.length > 0) {
+      const companionEmotion = companionNames[0].toLowerCase().includes('child') || companionNames[0].toLowerCase() === 'max' ? 'wonder' : 'smile';
+      medium += `${companionNames[0]}'s ${companionEmotion} said it all.`;
+    } else {
+      medium += 'Pure, simple joy.';
+    }
+  } else if (emotion === 'peace') {
+    const crowdOrStill = crowdContext ? crowdContext.charAt(0).toUpperCase() + crowdContext.slice(1) : 'Stillness';
+    medium += `${crowdOrStill}. `;
+    const companionGratitude = companionNames.length > 0 ? ", and you're grateful for who you're with" : '';
+    medium += `The kind of ${timeOfDay} where time slows down${companionGratitude}.`;
+  } else {
+    medium += `${lightingContext || weatherContext || 'The atmosphere'}. `;
+    const themeOrMemory = voiceAnalysis?.theme ? `A sense of ${voiceAnalysis.theme}.` : 'A moment worth remembering.';
+    medium += themeOrMemory;
+  }
+
+  // Full narrative (150-200 words)
+  let full = `${short}${companionPhrase}. `;
+
+  // Setting
+  const settingWeather = weatherContext ? weatherContext.charAt(0).toUpperCase() + weatherContext.slice(1) + ', ' : '';
+  const settingLight = lightingContext ? 'casting ' + lightingContext : '';
+  full += `${settingWeather}${timeOfDay} ${settingLight}. `;
+
+  const venueDesc = venue?.description || (venueCategory === 'landmark' ? 'A place steeped in history' : venueCategory === 'nature' ? 'Nature in its quiet power' : 'A place that draws you in');
+  full += `${venueDesc}. `;
+
+  // Build
+  const buildCrowd = crowdContext ? crowdContext.charAt(0).toUpperCase() + crowdContext.slice(1) + ', ' : '';
+  const buildAction = venueCategory === 'landmark' ? 'walked through' : venueCategory === 'dining' ? 'settled in' : 'explored';
+  const buildPace = crowdLevel === 'busy' || crowdLevel === 'packed' ? 'among the crowds' : 'at our own pace';
+  full += `${buildCrowd}we ${buildAction} ${buildPace}. `;
+
+  // Peak
+  if (companionNames.length > 0) {
+    const companionAction = emotion === 'awe' ? 'stood silent, taking it in' : emotion === 'joy' ? "couldn't stop smiling" : emotion === 'peace' ? 'seemed completely at ease' : 'was fully present';
+    full += `${companionNames[0]} ${companionAction}. `;
+  }
+
+  const placeContext = venueCategory === 'landmark' ? 'places like this' : 'moments like these';
+  const peakDetail = venue?.historicalSignificance || venue?.uniqueClaims[0] || `There's something about ${placeContext}`;
+  full += `${peakDetail}. `;
+
+  // Reflection
+  const reflectionText = voiceAnalysis?.theme === 'fulfillment' ? 'Everything we hoped for' :
+    voiceAnalysis?.theme === 'discovery' ? 'Discovery in every corner' :
+    voiceAnalysis?.theme === 'connection' ? 'Connection deeper than words' :
+    `The kind of ${emotion} that stays with you`;
+  full += `${reflectionText}. `;
+
+  const closing = companionNames.length > 0 ?
+    (companionNames.length === 1 ? 'Grateful we experienced this together.' : 'Grateful we shared this.') :
+    'A memory to carry forward.';
+  full += closing;
+
+  return {
+    short: short.slice(0, 100),
+    medium: medium.slice(0, 150),
+    full: full.slice(0, 300),
+  };
+}
+
+function buildSensoryAnchor(venueCategory: string, lighting: string | null, venue: SynthesisInput['venue']): string {
+  const categoryAnchors: Record<string, string> = {
+    landmark: lighting === 'golden_hour' ? 'Golden light on ancient stone' : lighting === 'night' ? 'Evening glow illuminating history' : 'The weight of centuries in the air',
+    dining: 'Aromas and quiet conversation',
+    nature: lighting === 'golden_hour' ? 'Sunlight through leaves' : 'Earth and open sky',
+    shopping: 'Color and movement everywhere',
+  };
+
+  return venue?.category ? (categoryAnchors[venue.category] || 'The light and atmosphere') : 'The moment itself';
+}
+
+function buildEmotionalAnchor(emotion: string, hasCompanions: boolean): string {
+  const anchors: Record<string, { solo: string; group: string }> = {
+    awe: { solo: 'Standing in wonder', group: 'Sharing this sense of awe' },
+    joy: { solo: 'Pure delight', group: 'Laughter and lightness together' },
+    peace: { solo: 'Finding stillness', group: 'Quiet togetherness' },
+    excitement: { solo: 'Energy and discovery', group: 'Shared excitement' },
+    gratitude: { solo: 'Deep appreciation', group: 'Grateful for this time together' },
+    nostalgia: { solo: 'Memories surfacing', group: 'Remembering together' },
+    wonder: { solo: 'Eyes wide open', group: 'Discovering together' },
+    reflection: { solo: 'Quiet reflection', group: 'Reflecting together' },
+  };
+
+  const anchor = anchors[emotion] || { solo: 'The feeling itself', group: 'Being here together' };
+  return hasCompanions ? anchor.group : anchor.solo;
+}
+
+function getCompanionReaction(emotion: string, ageGroup?: string): string {
+  const isChild = ageGroup === 'child';
+
+  const reactions: Record<string, { adult: string; child: string }> = {
+    awe: { adult: 'Moved by the magnitude of this place', child: 'Wide-eyed wonder at everything' },
+    joy: { adult: 'Radiant and fully present', child: 'Pure delight and energy' },
+    peace: { adult: 'Visibly at ease and content', child: 'Calm and curious' },
+    excitement: { adult: 'Energized and engaged', child: 'Bouncing with excitement' },
+    gratitude: { adult: 'Deeply appreciative', child: 'Happy to be here' },
+    nostalgia: { adult: 'Reflective and warm', child: 'Curious about the history' },
+    wonder: { adult: 'Curious and engaged', child: 'Asking questions about everything' },
+    reflection: { adult: 'Thoughtful and present', child: 'Taking it all in' },
+  };
+
+  const reaction = reactions[emotion] || { adult: 'Engaged and present', child: 'Curious and interested' };
+  return isChild ? reaction.child : reaction.adult;
 }
