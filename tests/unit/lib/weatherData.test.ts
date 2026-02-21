@@ -1,9 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   coarsenCoordinates,
   calculateOutdoorComfort,
   getMockWeatherData,
   WeatherDataSchema,
+  fetchWeather,
 } from '@/lib/weatherData';
 
 // =============================================================================
@@ -336,5 +337,265 @@ describe('WeatherDataSchema', () => {
       outdoor_comfort_score: 1,
     });
     expect(one.success).toBe(true);
+  });
+});
+
+// =============================================================================
+// fetchWeather ERROR PATH TESTS
+// =============================================================================
+
+describe('fetchWeather - Error Paths', () => {
+  const originalEnv = process.env.OPENWEATHER_API_KEY;
+  const originalFetch = global.fetch;
+
+  beforeEach(() => {
+    // Reset environment and fetch before each test
+    process.env.OPENWEATHER_API_KEY = 'test-api-key';
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
+  afterEach(() => {
+    // Restore original values
+    process.env.OPENWEATHER_API_KEY = originalEnv;
+    global.fetch = originalFetch;
+    vi.unstubAllGlobals();
+  });
+
+  it('returns error when API key is missing', async () => {
+    delete process.env.OPENWEATHER_API_KEY;
+
+    const result = await fetchWeather(35.7, 139.8);
+
+    expect(result.success).toBe(false);
+    expect(result.data).toBeNull();
+    expect(result.error).toContain('OPENWEATHER_API_KEY not configured');
+  });
+
+  it('returns error when API key is provided but empty', async () => {
+    const result = await fetchWeather(35.7, 139.8, '');
+
+    expect(result.success).toBe(false);
+    expect(result.data).toBeNull();
+  });
+
+  it('returns error on 401 Unauthorized (invalid API key)', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      statusText: 'Unauthorized',
+    } as Response);
+
+    const result = await fetchWeather(35.7, 139.8);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('401');
+  });
+
+  it('returns error on 403 Forbidden', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      statusText: 'Forbidden',
+    } as Response);
+
+    const result = await fetchWeather(35.7, 139.8);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('403');
+  });
+
+  it('returns error on 429 Rate Limit Exceeded', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      statusText: 'Too Many Requests',
+    } as Response);
+
+    const result = await fetchWeather(35.7, 139.8);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('429');
+  });
+
+  it('returns error on 500 Internal Server Error', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      statusText: 'Internal Server Error',
+    } as Response);
+
+    const result = await fetchWeather(35.7, 139.8);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('500');
+  });
+
+  it('returns error on 503 Service Unavailable', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: false,
+      status: 503,
+      statusText: 'Service Unavailable',
+    } as Response);
+
+    const result = await fetchWeather(35.7, 139.8);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('503');
+  });
+
+  it('returns error on malformed JSON response', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockRejectedValue(new Error('Unexpected token')),
+    } as any);
+
+    const result = await fetchWeather(35.7, 139.8);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBeDefined();
+  });
+
+  it('returns error when response missing required fields', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue({
+        // Missing required fields: coord, weather, main, wind, dt
+        incomplete: 'data',
+      }),
+    } as any);
+
+    const result = await fetchWeather(35.7, 139.8);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Invalid OpenWeather API response format');
+  });
+
+  it('returns error when weather array is empty', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue({
+        coord: { lat: 35.7, lon: 139.8 },
+        weather: [], // Empty array
+        main: { temp: 21, pressure: 1013, humidity: 45 },
+        wind: { speed: 2 },
+        dt: 1234567890,
+      }),
+    } as any);
+
+    const result = await fetchWeather(35.7, 139.8);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Invalid');
+  });
+
+  it('handles timeout with specific error message', async () => {
+    vi.mocked(fetch).mockRejectedValueOnce(new Error('The operation was aborted due to timeout'));
+
+    const result = await fetchWeather(35.7, 139.8);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Weather API timeout');
+  });
+
+  it('handles abort signal with timeout message', async () => {
+    vi.mocked(fetch).mockRejectedValueOnce(new Error('signal is aborted without reason'));
+
+    const result = await fetchWeather(35.7, 139.8);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Weather API timeout');
+  });
+
+  it('handles network errors', async () => {
+    vi.mocked(fetch).mockRejectedValueOnce(new Error('Failed to fetch'));
+
+    const result = await fetchWeather(35.7, 139.8);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Weather fetch failed');
+  });
+
+  it('handles DNS resolution failures', async () => {
+    vi.mocked(fetch).mockRejectedValueOnce(new Error('getaddrinfo ENOTFOUND'));
+
+    const result = await fetchWeather(35.7, 139.8);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('ENOTFOUND');
+  });
+
+  it('handles connection refused errors', async () => {
+    vi.mocked(fetch).mockRejectedValueOnce(new Error('connect ECONNREFUSED'));
+
+    const result = await fetchWeather(35.7, 139.8);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('ECONNREFUSED');
+  });
+
+  it('uses coarse coordinates in API request', async () => {
+    const mockFetch = vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue({
+        coord: { lat: 35.7, lon: 139.8 },
+        weather: [{ main: 'Clear', description: 'clear sky' }],
+        main: { temp: 21, pressure: 1013, humidity: 45 },
+        wind: { speed: 2 },
+        dt: 1234567890,
+      }),
+    } as any);
+
+    await fetchWeather(35.7148, 139.7967);
+
+    // Check that coarsened coordinates were used (35.7, 139.8)
+    const callUrl = mockFetch.mock.calls[0][0] as string;
+    expect(callUrl).toContain('lat=35.7');
+    expect(callUrl).toContain('lon=139.8');
+  });
+
+  it('sets coarse_location_used flag appropriately', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue({
+        coord: { lat: 35.7, lon: 139.8 },
+        weather: [{ main: 'Clear', description: 'clear sky' }],
+        main: { temp: 21, pressure: 1013, humidity: 45 },
+        wind: { speed: 2 },
+        dt: 1234567890,
+      }),
+    } as any);
+
+    const result = await fetchWeather(35.7, 139.8);
+
+    expect(result.coarse_location_used).toBe(true);
+  });
+
+  it('validates response data with schema before returning', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue({
+        coord: { lat: 35.7, lon: 139.8 },
+        weather: [{ main: 'Clear', description: 'clear sky' }],
+        main: { temp: 21, pressure: 1013, humidity: 45 },
+        wind: { speed: 2 },
+        dt: 1234567890,
+      }),
+    } as any);
+
+    const result = await fetchWeather(35.7, 139.8);
+
+    expect(result.success).toBe(true);
+    expect(result.data).toBeDefined();
+    // Data should conform to WeatherData schema
+    expect(result.data?.condition).toBe('Clear');
+    expect(result.data?.temperature_c).toBeCloseTo(21, 1);
+    expect(result.data?.outdoor_comfort_score).toBeGreaterThanOrEqual(0);
+    expect(result.data?.outdoor_comfort_score).toBeLessThanOrEqual(1);
   });
 });
