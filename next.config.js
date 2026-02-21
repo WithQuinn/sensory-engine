@@ -3,6 +3,11 @@ const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
 
+  // Enable instrumentation for startup validation
+  experimental: {
+    instrumentationHook: true,
+  },
+
   // Environment variables
   env: {
     NEXT_PUBLIC_APP_NAME: 'Sensory Engine',

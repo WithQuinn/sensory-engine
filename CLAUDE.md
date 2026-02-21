@@ -181,6 +181,38 @@ Every feature or PR must satisfy:
 
 **Why this matters:** Integration tests mock the API and won't catch model incompatibility. The 2026-02-08 Haiku incident in Travel repo showed all tests can pass while production returns 500 errors.
 
+#### How to Switch Claude Models
+
+**1. Local Testing:**
+```bash
+# Set in .env.local
+CLAUDE_MODEL=claude-haiku-4-20241022  # For faster/cheaper synthesis
+# or
+CLAUDE_MODEL=claude-opus-4-20250514   # For highest quality synthesis
+```
+
+**2. Vercel Deployment:**
+```bash
+# Add environment variable in Vercel dashboard
+CLAUDE_MODEL=claude-sonnet-4-20250514
+
+# Or via CLI
+vercel env add CLAUDE_MODEL
+```
+
+**3. Supported Models (February 2026):**
+- `claude-sonnet-4-20250514` - **Default** (balanced speed/quality)
+- `claude-opus-4-20250514` - Highest quality (slower, more expensive)
+- `claude-haiku-4-20241022` - Fastest (lower cost, good for high volume)
+
+**4. Model Selection Guide:**
+| Use Case | Recommended Model | Reason |
+|----------|------------------|---------|
+| Production (default) | Sonnet 4 | Best balance of quality/speed/cost |
+| High-quality events | Opus 4 | Best narratives for special moments |
+| High-volume testing | Haiku 4 | Fast + cheap, good enough quality |
+| Cost optimization | Haiku 4 | 10x cheaper than Sonnet |
+
 **See:** `tests/contract/README.md` for contract testing guide (TO BE CREATED)
 
 ### Performance/UX Testing

@@ -319,6 +319,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
       const anthropic = new Anthropic({ apiKey: anthropicKey });
       const prompt = buildSynthesisPrompt(synthesisInput);
+
+      // Claude model configuration (env variable with validated default)
+      // Supported models: claude-sonnet-4-20250514, claude-opus-4-20250514, claude-haiku-4-20241022
       const claudeModel = process.env.CLAUDE_MODEL || "claude-sonnet-4-20250514";
 
       logServerEvent("info", "Calling Claude for synthesis", {
