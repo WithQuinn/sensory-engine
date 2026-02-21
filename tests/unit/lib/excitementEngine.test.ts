@@ -301,8 +301,9 @@ describe('calculateTranscendenceScore', () => {
     const result = calculateTranscendenceScore(factors);
 
     expect(result.explanation).toHaveLength(3);
-    expect(result.explanation[0]).toContain('Iconic location');
-    expect(result.explanation[0]).toContain('95%');
+    // emotion_intensity (0.9 * 0.30 = 0.27) ranks higher than fame_score (0.95 * 0.15 = 0.1425)
+    expect(result.explanation[0]).toContain('Strong emotion');
+    expect(result.explanation[0]).toContain('90%');
   });
 
   it('formats factor labels correctly', () => {

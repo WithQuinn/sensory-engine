@@ -581,8 +581,20 @@ describe('fetchWeather - Error Paths', () => {
       status: 200,
       json: vi.fn().mockResolvedValue({
         coord: { lat: 35.7, lon: 139.8 },
-        weather: [{ main: 'Clear', description: 'clear sky' }],
-        main: { temp: 21, pressure: 1013, humidity: 45 },
+        weather: [{
+          id: 800,
+          main: 'Clear',
+          description: 'clear sky',
+          icon: '01d',
+        }],
+        main: {
+          temp: 21,
+          feels_like: 20,
+          pressure: 1013,
+          humidity: 45,
+          temp_min: 19,
+          temp_max: 23,
+        },
         wind: { speed: 2 },
         dt: 1234567890,
       }),
