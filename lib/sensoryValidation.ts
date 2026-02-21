@@ -554,17 +554,26 @@ export function safeParseSensoryInput(input: unknown): {
 // =============================================================================
 
 /**
- * Transcendence score weights (from story - marked as initial estimates)
+ * Transcendence score weights
+ *
+ * Tuned based on scenario analysis (2026-02-21):
+ * - Emotion is primary driver (30%)
+ * - Fame matters more than weather (15% vs 5%)
+ * - Atmosphere and novelty balanced (12% each)
+ * - Companion engagement context-aware (12%)
+ * - Intent and surprise moderate impact (10% + 4%)
+ *
+ * Total: 100%
  */
 export const TRANSCENDENCE_WEIGHTS = {
-  emotion_intensity: 0.25,
-  atmosphere_quality: 0.15,
-  novelty_factor: 0.15,
-  fame_score: 0.10,
-  weather_match: 0.10,
-  companion_engagement: 0.10,
-  intent_match: 0.10,
-  surprise_factor: 0.05,
+  emotion_intensity: 0.30,      // ↑ from 0.25 (emotion is the core)
+  atmosphere_quality: 0.12,     // ↓ from 0.15 (rebalanced)
+  novelty_factor: 0.12,         // ↓ from 0.15 (rebalanced)
+  fame_score: 0.15,             // ↑ from 0.10 (iconic places matter)
+  weather_match: 0.05,          // ↓ from 0.10 (less important than fame)
+  companion_engagement: 0.12,   // ↑ from 0.10 (connection matters)
+  intent_match: 0.10,           // = (unchanged)
+  surprise_factor: 0.04,        // ↓ from 0.05 (minor factor)
 } as const;
 
 /**

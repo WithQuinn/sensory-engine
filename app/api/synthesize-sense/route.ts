@@ -364,19 +364,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // Currently defaults to false (repeat visit) when session ID unavailable.
   // This is a safe conservative default that prevents systematic score inflation.
   //
-  // Future integration (Phase 2 - Profile Agent):
+  // Phase 2 - Profile Agent Integration (Future):
   // const visitHistory = await profileAgent.getVisitHistory(userId, venueId);
   // const isFirstVisit = visitHistory.count === 0;
   //
-  // For now, explicit first-visit tracking can be enabled by clients sending
-  // X-First-Visit: true header (trusted clients only).
-  // See Issue #69 for full integration plan.
+  // Current Implementation:
+  // Clients can explicitly signal first visits via X-First-Visit header.
+  // This allows trusted clients (iOS app with local visit tracking) to
+  // provide accurate visit history without requiring Profile Agent.
+  //
+  // See docs/profile-agent-integration.md for full integration plan.
   // ---------------------------------------------------------------------------
-  // Default to false (repeat visit) when visit history unavailable
-  // This prevents systematic score inflation for requests without session IDs
-  // TODO (Phase 2): Integrate with Profile Agent visit history tracking
-  // const isFirstVisit = await profileAgent.isFirstVisit(userId, venueId);
-  const isFirstVisit = false;
+  const firstVisitHeader = request.headers.get("X-First-Visit");
+  const isFirstVisit = firstVisitHeader === "true";
 
   const transcendenceFactors = buildTranscendenceFactors({
     sentimentScore: input.audio?.sentiment_score ?? null,
@@ -460,11 +460,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     },
 
     transcendence_score: transcendenceResult.score,
-    transcendence_factors: [
-      `Emotion: ${(transcendenceFactors.emotion_intensity * 100).toFixed(0)}%`,
-      `Atmosphere: ${(transcendenceFactors.atmosphere_quality * 100).toFixed(0)}%`,
-      `Fame: ${(transcendenceFactors.fame_score * 100).toFixed(0)}%`,
-    ],
+    transcendence_factors: transcendenceResult.explanation,
 
     sensory_details: {
       visual: synthesisOutput.memoryAnchors.sensory || "The scene before you",

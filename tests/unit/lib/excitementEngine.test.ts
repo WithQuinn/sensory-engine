@@ -286,6 +286,40 @@ describe('calculateTranscendenceScore', () => {
     const decimalPlaces = (result.score.toString().split('.')[1] || '').length;
     expect(decimalPlaces).toBeLessThanOrEqual(2);
   });
+
+  it('returns top 3 factor explanations in human-readable form', () => {
+    const factors: TranscendenceFactors = {
+      emotion_intensity: 0.9,
+      atmosphere_quality: 0.85,
+      novelty_factor: 0.75,
+      fame_score: 0.95,
+      weather_match: 0.8,
+      companion_engagement: 0.6,
+      intent_match: 0.5,
+      surprise_factor: 0.3,
+    };
+    const result = calculateTranscendenceScore(factors);
+
+    expect(result.explanation).toHaveLength(3);
+    expect(result.explanation[0]).toContain('Iconic location');
+    expect(result.explanation[0]).toContain('95%');
+  });
+
+  it('formats factor labels correctly', () => {
+    const emotionDominant: TranscendenceFactors = {
+      emotion_intensity: 1.0,
+      atmosphere_quality: 0.5,
+      novelty_factor: 0.4,
+      fame_score: 0.3,
+      weather_match: 0.2,
+      companion_engagement: 0.1,
+      intent_match: 0.1,
+      surprise_factor: 0.1,
+    };
+    const result = calculateTranscendenceScore(emotionDominant);
+
+    expect(result.explanation[0]).toBe('Strong emotion (100%)');
+  });
 });
 
 // =============================================================================
@@ -307,10 +341,10 @@ describe('buildTranscendenceFactors', () => {
 
     expect(factors.emotion_intensity).toBe(0.5);
     expect(factors.atmosphere_quality).toBe(0.5);
-    expect(factors.novelty_factor).toBe(0.4); // Not first visit
+    expect(factors.novelty_factor).toBe(0.45); // Not first visit (updated from 0.4)
     expect(factors.fame_score).toBe(0.3);
     expect(factors.weather_match).toBe(0.5);
-    expect(factors.companion_engagement).toBe(0.3); // 0 companions
+    expect(factors.companion_engagement).toBe(0.6); // Solo: meaningful solitude (updated from 0.3)
     expect(factors.intent_match).toBe(0.5);
     expect(factors.surprise_factor).toBe(0.2); // No unexpected moment
   });
@@ -327,7 +361,7 @@ describe('buildTranscendenceFactors', () => {
       hadUnexpectedMoment: false,
     });
 
-    expect(firstVisit.novelty_factor).toBe(0.85);
+    expect(firstVisit.novelty_factor).toBe(0.75); // Updated from 0.85 (reduced first visit bonus)
   });
 
   it('maps positive sentiment to higher emotion intensity', () => {
@@ -345,7 +379,7 @@ describe('buildTranscendenceFactors', () => {
     expect(positive.emotion_intensity).toBe(0.9);
   });
 
-  it('maps negative sentiment to lower emotion intensity (halved)', () => {
+  it('maps negative sentiment to emotion intensity via absolute value (grief, meaningful sadness)', () => {
     const negative = buildTranscendenceFactors({
       sentimentScore: -0.8,
       atmosphereQuality: null,
@@ -357,12 +391,26 @@ describe('buildTranscendenceFactors', () => {
       hadUnexpectedMoment: false,
     });
 
-    // -0.8 → abs(0.8) * 0.5 = 0.4
-    expect(negative.emotion_intensity).toBe(0.4);
+    // -0.8 → abs(-0.8) = 0.8 (deep emotions are transcendent regardless of valence)
+    expect(negative.emotion_intensity).toBe(0.8);
   });
 
-  it('scales companion engagement with count, capped at 0.9', () => {
-    const oneCompanion = buildTranscendenceFactors({
+  it('uses context-aware companion engagement (solo can be profound)', () => {
+    // Solo: meaningful solitude
+    const solo = buildTranscendenceFactors({
+      sentimentScore: null,
+      atmosphereQuality: null,
+      isFirstVisit: false,
+      fameScore: null,
+      weatherComfort: null,
+      companionCount: 0,
+      intentMatch: null,
+      hadUnexpectedMoment: false,
+    });
+    expect(solo.companion_engagement).toBe(0.6);
+
+    // Couple: intimate connection
+    const couple = buildTranscendenceFactors({
       sentimentScore: null,
       atmosphereQuality: null,
       isFirstVisit: false,
@@ -372,9 +420,23 @@ describe('buildTranscendenceFactors', () => {
       intentMatch: null,
       hadUnexpectedMoment: false,
     });
-    expect(oneCompanion.companion_engagement).toBe(0.5); // 0.3 + 1*0.2
+    expect(couple.companion_engagement).toBe(0.9);
 
-    const fourCompanions = buildTranscendenceFactors({
+    // Trio: close bonds
+    const trio = buildTranscendenceFactors({
+      sentimentScore: null,
+      atmosphereQuality: null,
+      isFirstVisit: false,
+      fameScore: null,
+      weatherComfort: null,
+      companionCount: 2,
+      intentMatch: null,
+      hadUnexpectedMoment: false,
+    });
+    expect(trio.companion_engagement).toBe(0.8);
+
+    // Small group: shared experience
+    const smallGroup = buildTranscendenceFactors({
       sentimentScore: null,
       atmosphereQuality: null,
       isFirstVisit: false,
@@ -384,9 +446,10 @@ describe('buildTranscendenceFactors', () => {
       intentMatch: null,
       hadUnexpectedMoment: false,
     });
-    expect(fourCompanions.companion_engagement).toBe(0.9); // Capped
+    expect(smallGroup.companion_engagement).toBe(0.7);
 
-    const tenCompanions = buildTranscendenceFactors({
+    // Large group: diffused but still meaningful
+    const largeGroup = buildTranscendenceFactors({
       sentimentScore: null,
       atmosphereQuality: null,
       isFirstVisit: false,
@@ -396,7 +459,7 @@ describe('buildTranscendenceFactors', () => {
       intentMatch: null,
       hadUnexpectedMoment: false,
     });
-    expect(tenCompanions.companion_engagement).toBe(0.9); // Still capped at 0.9
+    expect(largeGroup.companion_engagement).toBe(0.6);
   });
 
   it('gives higher surprise factor for unexpected moments', () => {
@@ -521,5 +584,13 @@ describe('getMockTranscendenceResult', () => {
     expect(result.factors).toHaveProperty('companion_engagement');
     expect(result.factors).toHaveProperty('intent_match');
     expect(result.factors).toHaveProperty('surprise_factor');
+  });
+
+  it('includes explanation field with top 3 factors', () => {
+    const result = getMockTranscendenceResult('highlight');
+    expect(result.explanation).toBeDefined();
+    expect(Array.isArray(result.explanation)).toBe(true);
+    expect(result.explanation.length).toBe(3);
+    expect(result.explanation[0]).toContain('%');
   });
 });

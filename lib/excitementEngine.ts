@@ -24,6 +24,7 @@ export interface TranscendenceResult {
   factors: TranscendenceFactors;
   isHighlight: boolean; // score >= 0.7
   dominantFactor: keyof TranscendenceFactors;
+  explanation: string[]; // Top 3 contributing factors in human-readable form
 }
 
 // =============================================================================
@@ -148,20 +149,46 @@ export function calculateTranscendenceScore(factors: TranscendenceFactors): Tran
   // Round to 2 decimal places
   const roundedScore = Math.round(score * 100) / 100;
 
-  // Find dominant factor
+  // Find dominant factor and build explanation
   const weightedFactors = Object.entries(factors).map(([key, value]) => ({
     key: key as keyof TranscendenceFactors,
+    value,
     weighted: value * TRANSCENDENCE_WEIGHTS[key as keyof typeof TRANSCENDENCE_WEIGHTS],
   }));
   weightedFactors.sort((a, b) => b.weighted - a.weighted);
   const dominantFactor = weightedFactors[0].key;
+
+  // Generate human-readable explanation of top 3 factors
+  const explanation = weightedFactors.slice(0, 3).map((f) => {
+    const percentage = Math.round(f.value * 100);
+    const label = formatFactorLabel(f.key);
+    return `${label} (${percentage}%)`;
+  });
 
   return {
     score: roundedScore,
     factors,
     isHighlight: roundedScore >= 0.7,
     dominantFactor,
+    explanation,
   };
+}
+
+/**
+ * Format factor key into human-readable label
+ */
+function formatFactorLabel(key: keyof TranscendenceFactors): string {
+  const labels: Record<keyof TranscendenceFactors, string> = {
+    emotion_intensity: 'Strong emotion',
+    atmosphere_quality: 'Great atmosphere',
+    novelty_factor: 'First-time discovery',
+    fame_score: 'Iconic location',
+    weather_match: 'Perfect weather',
+    companion_engagement: 'Meaningful connection',
+    intent_match: 'Met expectations',
+    surprise_factor: 'Unexpected moment',
+  };
+  return labels[key];
 }
 
 /**
@@ -189,16 +216,18 @@ export function buildTranscendenceFactors(params: {
   } = params;
 
   // Emotion intensity: derived from sentiment
-  // Map -1..1 to 0..1, with positive emotions scoring higher
+  // Use absolute value - deep emotions are transcendent regardless of valence
+  // Grief, awe, fear overcome are as meaningful as joy
   const emotionIntensity = sentimentScore !== null
-    ? Math.abs(sentimentScore) * (sentimentScore > 0 ? 1 : 0.5)
+    ? Math.abs(sentimentScore)
     : 0.5;
 
   // Atmosphere quality: direct from photo analysis
   const atmosphere = atmosphereQuality ?? 0.5;
 
-  // Novelty: first visits score higher
-  const novelty = isFirstVisit ? 0.85 : 0.4;
+  // Novelty: first visits score higher, but not overwhelming
+  // Tuned from 0.85/0.40 (2.1x) to 0.75/0.45 (1.67x)
+  const novelty = isFirstVisit ? 0.75 : 0.45;
 
   // Fame: direct from venue enrichment
   const fame = fameScore ?? 0.3;
@@ -206,9 +235,17 @@ export function buildTranscendenceFactors(params: {
   // Weather: direct from comfort score
   const weather = weatherComfort ?? 0.5;
 
-  // Companion engagement: more companions = potentially higher
-  // Capped at 0.9 for 4+ companions
-  const companionEngagement = Math.min(0.9, 0.3 + companionCount * 0.2);
+  // Companion engagement: context-aware scoring
+  // Solo can be profound (solitude, self-discovery): 0.6
+  // Couple/intimate (1-2): 0.8-0.9 (deep connection)
+  // Small group (3-4): 0.7 (shared experience)
+  // Large group (5+): 0.6 (diffused attention)
+  const companionEngagement =
+    companionCount === 0 ? 0.6  // Solo: meaningful solitude
+    : companionCount === 1 ? 0.9  // Couple: intimate connection
+    : companionCount === 2 ? 0.8  // Trio: close bonds
+    : companionCount <= 4 ? 0.7   // Small group: shared experience
+    : 0.6;                         // Large group: diffused but still meaningful
 
   // Intent match: how well the experience matched goals
   const intent = intentMatch ?? 0.5;
@@ -274,6 +311,7 @@ export function getMockTranscendenceResult(scenario: 'highlight' | 'moderate' | 
       },
       isHighlight: true,
       dominantFactor: 'fame_score',
+      explanation: ['Iconic location (95%)', 'Perfect weather (92%)', 'Great atmosphere (90%)'],
     },
     moderate: {
       score: 0.55,
@@ -289,6 +327,7 @@ export function getMockTranscendenceResult(scenario: 'highlight' | 'moderate' | 
       },
       isHighlight: false,
       dominantFactor: 'weather_match',
+      explanation: ['Perfect weather (70%)', 'Meaningful connection (60%)', 'Strong emotion (60%)'],
     },
     low: {
       score: 0.35,
@@ -304,6 +343,7 @@ export function getMockTranscendenceResult(scenario: 'highlight' | 'moderate' | 
       },
       isHighlight: false,
       dominantFactor: 'weather_match',
+      explanation: ['Perfect weather (50%)', 'Great atmosphere (40%)', 'Meaningful connection (40%)'],
     },
   };
 
