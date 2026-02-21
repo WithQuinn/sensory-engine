@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   calculateFameScore,
   extractFoundedYear,
@@ -8,6 +8,7 @@ import {
   getMockVenueData,
   FAMOUS_VENUE_MOCKS,
   VenueEnrichmentSchema,
+  fetchVenueEnrichment,
 } from '@/lib/sensoryData';
 
 // =============================================================================
@@ -392,5 +393,305 @@ describe('FAMOUS_VENUE_MOCKS', () => {
     Object.values(FAMOUS_VENUE_MOCKS).forEach(mock => {
       expect(mock.category).toBe('landmark');
     });
+  });
+});
+
+// =============================================================================
+// fetchVenueEnrichment - Error Paths
+// =============================================================================
+
+describe('fetchVenueEnrichment - Error Paths', () => {
+  // Store original fetch
+  const originalFetch = global.fetch;
+
+  // Helper to create valid Wikipedia search response
+  const createSearchResponse = (title: string, pageid = 12345) => ({
+    batchcomplete: true,
+    query: {
+      search: [{
+        ns: 0,
+        title,
+        pageid,
+        size: 5000,
+        wordcount: 500,
+        snippet: `${title} is a famous venue`,
+        timestamp: '2024-01-01T00:00:00Z',
+      }],
+    },
+  });
+
+  // Helper to create valid Wikipedia page response
+  const createPageResponse = (title: string, extract: string, options: {
+    description?: string;
+    categories?: { sortkey: string; title: string }[];
+    fullurl?: string;
+  } = {}) => ({
+    batchcomplete: true,
+    query: {
+      pages: {
+        '12345': {
+          pageid: 12345,
+          ns: 0,
+          title,
+          extract,
+          description: options.description || `${title} description`,
+          categories: options.categories || [{ sortkey: '', title: 'Category:Landmarks' }],
+          fullurl: options.fullurl || `https://en.wikipedia.org/wiki/${title.replace(/ /g, '_')}`,
+        },
+      },
+    },
+  });
+
+  afterEach(() => {
+    // Restore original fetch after each test
+    global.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it('returns error when Wikipedia search fails (network error)', async () => {
+    global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
+
+    const result = await fetchVenueEnrichment('Nonexistent Venue Network Error Test');
+
+    expect(result.success).toBe(false);
+    expect(result.data).toBeNull();
+    // Network errors in searchWikipedia return null, which becomes "Venue not found"
+    expect(result.error).toBe('Venue not found on Wikipedia');
+    expect(result.source).toBe('none');
+  });
+
+  it('returns error when Wikipedia search returns invalid JSON', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => {
+        throw new Error('Invalid JSON');
+      },
+    });
+
+    const result = await fetchVenueEnrichment('Invalid JSON Test Venue');
+
+    expect(result.success).toBe(false);
+    expect(result.data).toBeNull();
+    // JSON parse errors in searchWikipedia return null, which becomes "Venue not found"
+    expect(result.error).toBe('Venue not found on Wikipedia');
+  });
+
+  it('returns error when venue not found on Wikipedia', async () => {
+    // Mock empty search results (but valid schema)
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        batchcomplete: true,
+        query: {
+          search: [], // No results
+        },
+      }),
+    });
+
+    const result = await fetchVenueEnrichment('Nonexistent Venue XYZ123');
+
+    expect(result.success).toBe(false);
+    expect(result.data).toBeNull();
+    expect(result.error).toBe('Venue not found on Wikipedia');
+    expect(result.source).toBe('none');
+  });
+
+  it('returns error when page fetch fails after successful search', async () => {
+    global.fetch = vi.fn().mockImplementation(async (url) => {
+      const urlStr = url.toString();
+
+      // First call: search returns results
+      if (urlStr.includes('list=search')) {
+        return {
+          ok: true,
+          json: async () => createSearchResponse('Unique Test Venue Page Fetch'),
+        };
+      }
+
+      // Second call: page fetch fails
+      throw new Error('Page fetch failed');
+    });
+
+    const result = await fetchVenueEnrichment('Unique Test Venue Page Fetch');
+
+    expect(result.success).toBe(false);
+    expect(result.data).toBeNull();
+    // Page fetch errors are caught and return specific error message
+    expect(result.error).toBe('Could not fetch Wikipedia page');
+  });
+
+  it('returns error when page response has invalid schema', async () => {
+    global.fetch = vi.fn().mockImplementation(async (url) => {
+      const urlStr = url.toString();
+
+      if (urlStr.includes('list=search')) {
+        return {
+          ok: true,
+          json: async () => createSearchResponse('Tokyo Tower'),
+        };
+      }
+
+      // Invalid page response (missing required fields)
+      return {
+        ok: true,
+        json: async () => ({
+          batchcomplete: true,
+          query: {
+            pages: {
+              '12345': {
+                // Missing pageid, ns, title, extract
+                description: 'Some description',
+              },
+            },
+          },
+        }),
+      };
+    });
+
+    const result = await fetchVenueEnrichment('Tokyo Tower');
+
+    expect(result.success).toBe(false);
+    expect(result.data).toBeNull();
+  });
+
+  it('handles HTTP error responses (404, 500, etc.)', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      statusText: 'Internal Server Error',
+    });
+
+    const result = await fetchVenueEnrichment('Tokyo Tower');
+
+    expect(result.success).toBe(false);
+    expect(result.data).toBeNull();
+  });
+
+  it('handles timeout-like errors', async () => {
+    global.fetch = vi.fn().mockRejectedValue(new Error('Request timeout'));
+
+    const result = await fetchVenueEnrichment('Timeout Test Unique Venue');
+
+    expect(result.success).toBe(false);
+    // Timeout errors in searchWikipedia return null, which becomes "Venue not found"
+    expect(result.error).toBe('Venue not found on Wikipedia');
+  });
+
+  it('successful fetch validates data with Zod schema', async () => {
+    global.fetch = vi.fn().mockImplementation(async (url) => {
+      const urlStr = url.toString();
+
+      if (urlStr.includes('list=search')) {
+        return {
+          ok: true,
+          json: async () => createSearchResponse('Tokyo Tower'),
+        };
+      }
+
+      return {
+        ok: true,
+        json: async () => createPageResponse(
+          'Tokyo Tower',
+          'Tokyo Tower is a communications and observation tower in the Shiba-koen district of Minato, Tokyo, Japan.',
+          { description: 'Communications tower in Tokyo' }
+        ),
+      };
+    });
+
+    const result = await fetchVenueEnrichment('Tokyo Tower');
+
+    expect(result.success).toBe(true);
+    expect(result.data).toBeDefined();
+    expect(result.data?.verified_name).toBe('Tokyo Tower');
+    expect(result.source).toBe('wikipedia');
+
+    // Validate structure matches schema
+    const parsed = VenueEnrichmentSchema.safeParse(result.data);
+    expect(parsed.success).toBe(true);
+  });
+
+  it('uses destination parameter to improve search accuracy', async () => {
+    let allSearchQueries: string[] = [];
+
+    global.fetch = vi.fn().mockImplementation(async (url) => {
+      const urlStr = url.toString();
+
+      if (urlStr.includes('list=search')) {
+        // Capture all search queries (parallel fallback makes multiple requests)
+        const urlObj = new URL(urlStr);
+        const query = urlObj.searchParams.get('srsearch') || '';
+        allSearchQueries.push(query);
+
+        return {
+          ok: true,
+          json: async () => createSearchResponse('UniqueTempleXYZ789'),
+        };
+      }
+
+      return {
+        ok: true,
+        json: async () => createPageResponse('UniqueTempleXYZ789', 'Ancient Buddhist temple'),
+      };
+    });
+
+    await fetchVenueEnrichment('UniqueTempleXYZ789', 'Kyoto Japan');
+
+    // At least one search should include both venue name and destination
+    const combinedSearch = allSearchQueries.some(q =>
+      q.includes('UniqueTempleXYZ789') && q.includes('Kyoto Japan')
+    );
+    expect(combinedSearch).toBe(true);
+  });
+
+  it('handles empty extract gracefully', async () => {
+    global.fetch = vi.fn().mockImplementation(async (url) => {
+      const urlStr = url.toString();
+
+      if (urlStr.includes('list=search')) {
+        return {
+          ok: true,
+          json: async () => createSearchResponse('Test Venue'),
+        };
+      }
+
+      return {
+        ok: true,
+        json: async () => createPageResponse('Test Venue', ''), // Empty extract
+      };
+    });
+
+    const result = await fetchVenueEnrichment('Test Venue');
+
+    // Should still succeed but with minimal data
+    expect(result.success).toBe(true);
+    expect(result.data?.verified_name).toBe('Test Venue');
+  });
+
+  it('handles missing optional fields (categories, description)', async () => {
+    global.fetch = vi.fn().mockImplementation(async (url) => {
+      const urlStr = url.toString();
+
+      if (urlStr.includes('list=search')) {
+        return {
+          ok: true,
+          json: async () => createSearchResponse('Test Venue'),
+        };
+      }
+
+      return {
+        ok: true,
+        json: async () => createPageResponse(
+          'Test Venue',
+          'Some description',
+          { categories: [], description: undefined }
+        ),
+      };
+    });
+
+    const result = await fetchVenueEnrichment('Test Venue');
+
+    // Should handle missing optional fields gracefully
+    expect(result.success).toBe(true);
+    expect(result.data?.category).toBeDefined(); // Should have default category
   });
 });
