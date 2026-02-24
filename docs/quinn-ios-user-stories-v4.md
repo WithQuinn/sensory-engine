@@ -1,9 +1,53 @@
 # Quinn iOS App - User Stories v4
 
-**Version:** 4.1
-**Date:** 2026-02-23
+**Version:** 4.2
+**Date:** 2026-02-24
 **Authors:** Claude Sonnet (v4 rewrite + cross-repo audit), Claude Opus (v2/v3 strategy), Sachin Verma (product)
 **Purpose:** iOS user stories validated against business personas (Sarah, Marco, David, Linda, Aisha), persona panel research, and ALL Quinn repos (sensory-engine, travel, business, Quinn iOS, QuinnAudio, .com, SensoryEngine). Travel is the acquisition hook. Ambient journaling is the platform.
+
+---
+
+## V4 Launch Constraints
+
+### 1. Launch Personas: Sarah, Marco, and Linda Only
+
+**David (Privacy-Conscious Engineer) and Aisha (Mindfulness Practitioner) are NOT V4 launch targets.**
+
+Their stories are retained in this document for product completeness, but the following applies for V4:
+
+- **GTM messaging must not address David or Aisha.** No "open source", "self-hostable", "mindfulness", "presence vs. capture" language in launch marketing, App Store copy, or acquisition campaigns.
+- **Features built for David or Aisha (US-302 Edit/Override, US-501 Privacy Dashboard) are built because they improve the product for all personas** — not because we are launching to David or Aisha specifically.
+- David's conversion is post-launch work: requires a public architecture doc, third-party audit, and network traffic verification. Not feasible in V4.
+- Aisha's conversion requires honest copy addressing the ambient-capture paradox. Deferred to V4.1+ once we have real user language from Linda/Sarah/Marco.
+
+> **The "David test" and "Aisha test" in the DoD are engineering quality gates, not marketing targets.** Keep them as internal quality checks.
+
+### 2. Architecture Principle: Local-First First Iteration
+
+**The first iteration of every feature must process all user data on-device. No user data is sent to any cloud API.**
+
+This is an architectural constraint, not a positioning choice:
+
+| Data Type | Rule |
+|-----------|------|
+| Photos | Analysed on-device via Vision/CoreML — never sent to any API |
+| Voice / audio | Never transmitted |
+| Voice transcript | Processed on-device via `SFSpeechRecognizer` + `NLTagger` — never transmitted |
+| GPS / location | Never transmitted — only user-provided venue name used |
+| Narrative generation | **On-device LLM first** (Llama 3.2 3B via MLX, Phi-3, or Apple Intelligence). SE cloud API is the quality-validated upgrade path — not the default. |
+| Venue enrichment | Cloud permitted — not user-personal data ✅ |
+| Weather | Cloud permitted — coarsened coordinates only ✅ |
+
+**Impact on current stories:**
+- Narrative generation (US-301) must be attempted on-device first. SE API is the fallback if the quality spike fails, not the starting point.
+- `LLMParserService.swift` (Quinn iOS): replace Gemini with on-device model. Travel API is acceptable as interim if on-device quality is insufficient.
+- "Deploy Sensory Engine" is a Phase 2 decision gate, not a Phase 1 prerequisite.
+
+### 3. Telemetry Tool: PostHog iOS SDK
+
+All telemetry uses **PostHog iOS SDK (`posthog-ios`)** — anonymous, ephemeral sessions, no user identity, no device fingerprint. See Cross-Cutting Requirements → Telemetry for the full event schema.
+
+---
 
 ---
 
@@ -91,8 +135,8 @@ Every story must pass:
 | MomentSense schema | `lib/sensoryValidation.ts` | Port Zod types to Swift `@Model` classes |
 | SensoryInput schema | `lib/sensoryValidation.ts` | Port to Swift structs for API payload |
 | TranscendenceFactors | `lib/sensoryValidation.ts` | Port scoring weights to Swift |
-| Narrative synthesis prompt | `lib/sensoryPrompts.ts` | Keep as-is -- iOS calls the API |
-| Fallback narrative engine | `lib/sensoryPrompts.ts` | Port to Swift for offline mode |
+| Narrative synthesis prompt | `lib/sensoryPrompts.ts` | **Port to Swift as primary path** (on-device LLM). SE API is quality-gate fallback only — see V4 Launch Constraints. |
+| Fallback narrative engine | `lib/sensoryPrompts.ts` | Port to Swift — **this is now the V4 primary path, not the fallback** |
 | Transcendence scoring algorithm | `lib/excitementEngine.ts` | Pure math -- direct port to Swift |
 | Wikipedia venue enrichment | `lib/sensoryData.ts` | Keep server-side, iOS consumes API |
 | Weather integration | `lib/weatherData.ts` | Keep server-side, 11km coarsening intact |
@@ -117,7 +161,7 @@ Every story must pass:
 | Itinerary import UI | `Features/FactAgent/ItineraryImport/View/ItineraryImportView.swift` | **Already built** -- SwiftUI import screen |
 | Itinerary review UI | `Features/FactAgent/ItineraryImport/View/ItineraryReviewView.swift` | **Already built** -- SwiftUI review screen |
 | Import ViewModel | `Features/FactAgent/ItineraryImport/ViewModel/ItineraryImportViewModel.swift` | **Already built** -- MVVM pattern |
-| LLM parser service | `Services/LLMParserService.swift` | Exists but uses Gemini -- **DECISION: switch to Travel API or keep Gemini?** |
+| LLM parser service | `Services/LLMParserService.swift` | Exists but uses Gemini -- **DECISION RESOLVED: replace with on-device LLM (Llama 3.2 3B via MLX or Apple Intelligence). Travel API acceptable as interim if on-device quality insufficient, but cloud-to-cloud (Gemini) is not permitted per V4 local-first constraint.** |
 | BrandTheme | `BrandTheme.swift` | Exists but uses blue glow -- **needs update to match canonical theme** |
 | Home screen shell | `Features/Home/HomeView.swift` | **Already built** -- basic home view |
 | Color hex extension | `BrandTheme.swift` | **Already built** -- `Color(hex:)` utility |
@@ -399,7 +443,7 @@ Every story must pass:
 | SwiftData ItineraryItem model | **Reuse** | Quinn: `ItineraryItem.swift` | **Already built** -- SwiftData @Model with title, date, location, attendees, confidence scores. Extend for Journey grouping. |
 | Import UI + ViewModel | **Reuse** | Quinn: `ItineraryImportView.swift`, `ItineraryImportViewModel.swift` | **Already built** -- MVVM import + review flow. Restyle to match dark theme. |
 | Home screen entry point | **Partial** | Quinn: `HomeView.swift` | Shell exists -- add "Where to next?" card. |
-| LLM parser service | **Decision** | Quinn: `LLMParserService.swift` | Currently uses Gemini API. **DECISION: switch to Travel API (recommended) or keep Gemini?** |
+| LLM parser service | **Decision** | Quinn: `LLMParserService.swift` | Currently uses Gemini API. **DECISION RESOLVED: replace with on-device LLM (per V4 local-first constraint). Travel API as interim if on-device quality fails quality spike.** |
 
 #### Acceptance Criteria
 
@@ -659,9 +703,9 @@ Every story must pass:
 
 | Component | Status | Source | Notes |
 |-----------|--------|--------|-------|
-| Narrative generation | **Reuse** | SE: `sensoryPrompts.ts` + `/api/synthesize-sense` | Production prompt, 7 emotion tones, anti-cliche. Deploy SE, call from iOS. |
+| Narrative generation | **Port to Swift** | SE: `sensoryPrompts.ts` + on-device LLM | **V4 primary path: on-device LLM (Llama 3.2 3B / Apple Intelligence) with ported SE prompt. SE `/api/synthesize-sense` is the quality-spike fallback if on-device output fails the 85% quality bar.** |
 | MomentSense response | **Reuse** | SE: `MomentSenseSchema` | narratives, emotions, anchors, sensory details, atmosphere, transcendence |
-| Fallback narratives | **Reuse** | SE: `generateFallbackNarrative()` | Port to Swift for offline. |
+| Fallback narratives | **Reuse as primary** | SE: `generateFallbackNarrative()` | **Port to Swift — this IS the V4 primary path.** SE API is the upgrade path after quality validation. |
 | Transcendence scoring | **Reuse** | SE: `calculateTranscendenceScore()` | Port algorithm to Swift. |
 | Memory review UI | **New** | -- | Hero photo, narrative, photo strip, voice player, signal pills, CTAs. |
 | Signal pills | **New** | -- | "Morning visit", "About 2 hours", "12C overcast", "Unhurried" |
@@ -713,15 +757,16 @@ Every story must pass:
 - [ ] Three CTAs: "This feels right" (primary), "Add a photo" (ghost), "Refine" (ghost)
 - [ ] Narrative generated by calling deployed SE API with metadata-only payload
 
-**Narrative Generation Pipeline:**
+**Narrative Generation Pipeline (local-first):**
 - [ ] iOS extracts metadata on-device:
   - Photo: scene_type, lighting, face_count, crowd_level, energy_level (Vision)
   - Voice: sentiment_score, detected_tone, keywords (Speech + NLTagger)
   - Context: arrival_time, departure_time, duration, weather
-- [ ] iOS sends ONLY metadata to SE API (existing `SensoryInputSchema`)
-- [ ] SE returns `MomentSense` with narratives, emotions, sensory details, anchors
-- [ ] iOS stores `MomentSense` in SwiftData
-- [ ] If offline: use ported `generateFallbackNarrative()`
+- [ ] iOS runs ported SE prompt against **on-device LLM** (Llama 3.2 3B via MLX or Apple Intelligence) with metadata as context
+- [ ] On-device LLM returns narrative, emotions, sensory details — no network call
+- [ ] iOS stores result in SwiftData
+- [ ] **Quality spike gate:** If on-device narrative quality < 85% of SE Claude output (evaluated pre-launch), then — and only then — fall back to sending metadata to SE API. Raw photos, audio, and transcripts are never transmitted regardless.
+- [ ] SE API fallback path: iOS sends ONLY metadata (`SensoryInputSchema`) — never photos, audio, or transcripts
 
 **Narrative Quality (persona panel decision gate):**
 - [ ] Narratives feel emotionally resonant, not template-driven
@@ -963,6 +1008,41 @@ This story directly addresses David's conversion blocker: he went from 7.5/10 (p
 
 ## Cross-Cutting Requirements
 
+### Telemetry Implementation
+
+**Tool:** PostHog iOS SDK (`posthog-ios`). All events are anonymous — no user identity, no device fingerprint. Session IDs ephemeral, cleared on app close.
+
+**Privacy constraints enforced per event:**
+- Photos: never log content — only derived signals (`scene_type`, `lighting`, `crowd_level`)
+- Voice: never log transcripts — only derived signals (`sentiment`, `tone`, `keywords`)
+- GPS: never log coordinates — only user-provided `venue_name`
+
+**Global event schema:**
+
+| Event | Properties | PM / Analyst Use Case |
+|-------|-----------|----------------------|
+| `app_opened` | `cold_start: bool` | DAU/MAU, retention baseline |
+| `capture_started` | `input_types: {photo, audio, location}` booleans | Which input combos drive full captures? |
+| `capture_completed` | `photo_count: int`, `has_audio: bool`, `has_location: bool`, `duration_seconds: int` | Funnel completion rate |
+| `capture_abandoned` | `step: "photo"\|"audio"\|"narrative"`, `time_elapsed_seconds: int` | Where does the funnel break? |
+| `narrative_generated` | `generation_duration_ms: int`, `model: str` (e.g. `"llama-3.2-3b"` or `"se-api"`) | On-device model latency; cloud fallback rate |
+| `memory_reviewed` | *(count only — no properties)* | Are users re-opening memories? D7/D30 retention |
+| `memory_accepted_without_edit` | `accepted: bool` | Narrative quality proxy |
+| `memory_edited` | `fields_changed: int` | How much correction does Quinn need? |
+| `memory_deleted` | *(no properties)* | Regret signal |
+| `arrival_detected` | *(count only)* | Geofence reliability |
+| `onboarding_completed` | `steps_skipped: int` | Onboarding friction |
+| `feedback_submitted` | `sentiment: "positive"\|"neutral"\|"negative"`, `category: str` | Qualitative signal |
+
+**Key PM metrics:**
+1. Core loop: `capture_started` → `capture_completed` funnel. Target: >60%
+2. Quality: `memory_accepted_without_edit` rate. Target: >70% before launch
+3. Retention: `memory_reviewed` per user at D7 and D30
+4. Performance: `narrative_generated.generation_duration_ms` p50/p95 by model. Target: p50 < 3s on A15+
+5. Cloud fallback rate: % of `narrative_generated` events where `model = "se-api"` — should trend toward 0% as on-device improves
+
+---
+
 ### Privacy Architecture
 
 **Data Classification (enforced by architecture):**
@@ -1067,7 +1147,7 @@ This story directly addresses David's conversion blocker: he went from 7.5/10 (p
 1. US-001 First Encounter + US-102 Review Places (core first-run loop)
 2. US-002 Permission Onboarding
 3. US-101 Start Journey (returning user flow)
-4. **Deploy Sensory Engine** to Vercel (replace Phi-3 mocks with Claude)
+4. **Narrative quality spike** (Week 4): test on-device LLM output vs SE Claude — this is the decision gate for Phase 2 narrative strategy. SE deployment to Vercel only if quality spike fails.
 
 **Phase 2 (Weeks 5-10): The Platform**
 5. US-202 Voice Notes (**Linda's PMF -- start early**)
@@ -1110,8 +1190,8 @@ Vision metadata extraction
 | PhotoKit performance | 10,000+ photos by date range in < 1s? | 1 day | US-201 | Sarah (4000+ baby photos) |
 | Vision framework quality | Scene/lighting/crowd matching SE schema? | 2 days | US-301 | All |
 | Speech accuracy | Accuracy with: elderly speaker, travel noise, quiet reflection? | 2 days | US-202 | **Linda (critical)**, Marco, Aisha |
-| SE deployment | Deploy SE to Vercel, verify Claude synthesis with real data | 1 day | US-301 | All |
-| Narrative quality | SE Claude prompt with real metadata -- quality sufficient? | 1 day | US-301 | **All (decision gate)** |
+| On-device narrative quality | Test Llama 3.2 3B / Apple Intelligence output vs SE Claude prompt with same metadata. If on-device >= 85% quality → ship local-only. If < 85% → SE API fallback activated. | 2 days | US-301 | **All (decision gate)** |
+| SE deployment | Deploy SE to Vercel only if narrative quality spike fails on-device threshold | 1 day | US-301 (conditional) | All |
 | Battery impact | Real-device 8-hour test: ML + location + capture | 2 days | US-201 | **Sarah (#1 churn driver)** |
 
 ---
@@ -1141,8 +1221,8 @@ Vision metadata extraction
 | Energy Score (0-100) | **Replaced** by Sensory Anchors | Prose > numbers |
 | Screenshot disable | **Cut** | Paternalistic |
 | Map view for location trail | **Deferred** to Privacy Dashboard | Verification tool, not memory tool |
-| Phi-3 on-device LLM | **Replaced** by Claude API | Quality is decision gate (panel finding) |
-| Apple Intelligence adapter | **Deferred** | SDK not ready |
+| Phi-3 on-device LLM | **Reinstated as V4 primary path** | Local-first constraint requires on-device narrative generation. Quality spike determines if SE API upgrade is needed. |
+| Apple Intelligence adapter | **Deferred** | SDK not ready — Llama 3.2 3B via MLX is the V4 on-device model |
 | Invented personas (Yuki, Marcus, Chen Family) | **Replaced** | Business personas validated through 4 rounds of panels |
 | Companion tracking (per-person) | **Deferred** | "Confuses everyone" per v2 panel. SE has CompanionInput schema but messaging unclear. Revisit Phase 4. |
 | Passive conversation capture | **Deferred** | Identified as future differentiator in v2.4 spec review. Privacy implications need resolution. |
@@ -1212,6 +1292,7 @@ Every feature must satisfy:
 
 ## Document History
 
+- **v4.2** (2026-02-24): Applied three V4 launch constraints from product review: (1) David and Aisha explicitly marked as non-launch-target personas — their stories retained for product completeness but excluded from GTM messaging; (2) Local-first enforced as architectural constraint — narrative generation flipped to on-device LLM primary with SE API as quality-gate fallback only; Phi-3/Llama reinstated, Gemini parser resolved to on-device; Phase 1 "Deploy SE" replaced with narrative quality spike; (3) PostHog iOS SDK specified as global telemetry tool with full event schema and PM/analyst use cases in Cross-Cutting Requirements. (Opus)
 - **v4.1** (2026-02-23): Cross-repo audit against all 7 Quinn repos. Added QuinnAudio (audio recording, battery monitor, device detection) and Quinn iOS (ItineraryItem model, import MVVM, HomeView) to codebase inventory. Fixed 12 components incorrectly marked "New" that already exist. Added Travel repo features (SSE streaming, iterative refinement, venue insights cache). Added design system decision (3 divergent themes). Added processing pipeline visualization to US-501. Clarified companion tracking as deferred. (Sonnet)
 - **v4.0** (2026-02-23): Rewrite against validated business personas (Sarah, Marco, David, Linda, Aisha). Replaced invented personas. Added caregiving stories (Linda PMF 8.5/10). Added editability (panel #1 gap). Added Privacy Dashboard (David's verification gap). Elevated Voice Notes to Phase 2. Added persona-specific tests to DoD. (Sonnet)
 - **v3.0** (2026-02-23): Integrated Sensory Engine codebase analysis. Added build/reuse inventory. Resolved narrative strategy. (Opus)
