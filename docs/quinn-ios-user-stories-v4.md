@@ -1,9 +1,9 @@
 # Quinn iOS App - User Stories v4
 
-**Version:** 4.0
+**Version:** 4.1
 **Date:** 2026-02-23
-**Authors:** Claude Sonnet (v4 rewrite), Claude Opus (v2/v3 strategy), Sachin Verma (product)
-**Purpose:** iOS user stories validated against business personas (Sarah, Marco, David, Linda, Aisha), persona panel research, and Sensory Engine codebase. Travel is the acquisition hook. Ambient journaling is the platform.
+**Authors:** Claude Sonnet (v4 rewrite + cross-repo audit), Claude Opus (v2/v3 strategy), Sachin Verma (product)
+**Purpose:** iOS user stories validated against business personas (Sarah, Marco, David, Linda, Aisha), persona panel research, and ALL Quinn repos (sensory-engine, travel, business, Quinn iOS, QuinnAudio, .com, SensoryEngine). Travel is the acquisition hook. Ambient journaling is the platform.
 
 ---
 
@@ -84,36 +84,102 @@ Every story must pass:
 
 ### What Exists (Reusable)
 
-| Asset | Repo | File | Reuse Strategy |
-|-------|------|------|----------------|
-| MomentSense schema | Sensory Engine | `lib/sensoryValidation.ts` | Port Zod types to Swift `@Model` classes |
-| SensoryInput schema | Sensory Engine | `lib/sensoryValidation.ts` | Port to Swift structs for API payload |
-| TranscendenceFactors | Sensory Engine | `lib/sensoryValidation.ts` | Port scoring weights to Swift |
-| Narrative synthesis prompt | Sensory Engine | `lib/sensoryPrompts.ts` | Keep as-is -- iOS calls the API |
-| Fallback narrative engine | Sensory Engine | `lib/sensoryPrompts.ts` | Port to Swift for offline mode |
-| Transcendence scoring algorithm | Sensory Engine | `lib/excitementEngine.ts` | Pure math -- direct port to Swift |
-| Wikipedia venue enrichment | Sensory Engine | `lib/sensoryData.ts` | Keep server-side, iOS consumes API |
-| Weather integration | Sensory Engine | `lib/weatherData.ts` | Keep server-side, 11km coarsening intact |
-| Device capability detection | Sensory Engine | `lib/deviceCapability.ts` | Replace with native `ProcessInfo` + `UIDevice` |
-| Venue discovery flow | Travel | `app/api/parse-itinerary/route.ts` | iOS calls existing API |
-| Venue suggestions | Travel | `app/api/suggest-venues/route.ts` | iOS calls existing API |
-| Design tokens | Three-journeys mockup | `mocks/three-journeys.html` | Extract to SwiftUI `BrandTheme` |
-| Privacy architecture | Sensory Engine | `PROJECT.md` | Hybrid model already designed |
+**Sensory Engine (Next.js -- `WithQuinn/sensory-engine`)**
 
-### What Must Be Built (iOS-Native)
+| Asset | File | Reuse Strategy |
+|-------|------|----------------|
+| MomentSense schema | `lib/sensoryValidation.ts` | Port Zod types to Swift `@Model` classes |
+| SensoryInput schema | `lib/sensoryValidation.ts` | Port to Swift structs for API payload |
+| TranscendenceFactors | `lib/sensoryValidation.ts` | Port scoring weights to Swift |
+| Narrative synthesis prompt | `lib/sensoryPrompts.ts` | Keep as-is -- iOS calls the API |
+| Fallback narrative engine | `lib/sensoryPrompts.ts` | Port to Swift for offline mode |
+| Transcendence scoring algorithm | `lib/excitementEngine.ts` | Pure math -- direct port to Swift |
+| Wikipedia venue enrichment | `lib/sensoryData.ts` | Keep server-side, iOS consumes API |
+| Weather integration | `lib/weatherData.ts` | Keep server-side, 11km coarsening intact |
+| Privacy architecture | `PROJECT.md` | Hybrid model already designed |
 
-| Component | Stories | Framework | Complexity |
-|-----------|---------|-----------|------------|
-| CoreLocation geofencing | US-201 | CoreLocation | High |
-| PhotoKit time-window queries | US-201 | PhotoKit | Medium |
-| Vision photo analysis | US-301 | Vision, CoreML | Medium |
-| Speech transcription | US-202 | Speech | Medium |
-| SwiftData persistence | All | SwiftData | Medium |
-| Background task scheduling | US-201 | BGTaskScheduler | High |
-| SwiftUI screens (17+ total) | All | SwiftUI | Medium-High |
-| Permission management | US-002, US-401 | iOS Permissions | Low-Medium |
-| Edit/Override system | US-302, US-401 | SwiftUI + SwiftData | Medium |
-| Network audit log | US-501 | URLSession interceptor | Medium |
+**Travel / Fact Agent (Next.js -- `WithQuinn/travel`)**
+
+| Asset | File | Reuse Strategy |
+|-------|------|----------------|
+| Venue discovery flow | `app/api/parse-itinerary/route.ts` | iOS calls existing API |
+| Venue suggestions + SSE streaming | `app/api/suggest-venues/route.ts` | iOS calls API, stream venue cards in real-time |
+| Iterative refinement questions | `lib/smartRefinement.ts` | iOS calls API for follow-up questions per destination |
+| Seed question cache | `lib/refinementCache.ts` | Instant first question for popular destinations (zero API call) |
+| Venue insights cache | `lib/insightsCache.ts` | Pre-curated facts/atmosphere/poetic for 30+ venues (instant load) |
+| CSRF + API client | `lib/apiClient.ts` | Pattern for secure API calls with session tokens |
+
+**Quinn iOS App (Swift -- `WithQuinn/Quinn`)**
+
+| Asset | File | Reuse Strategy |
+|-------|------|----------------|
+| ItineraryItem SwiftData model | `Features/FactAgent/ItineraryImport/Model/ItineraryItem.swift` | **Already built** -- SwiftData @Model with title, date, time, location, attendees, notes |
+| Itinerary import UI | `Features/FactAgent/ItineraryImport/View/ItineraryImportView.swift` | **Already built** -- SwiftUI import screen |
+| Itinerary review UI | `Features/FactAgent/ItineraryImport/View/ItineraryReviewView.swift` | **Already built** -- SwiftUI review screen |
+| Import ViewModel | `Features/FactAgent/ItineraryImport/ViewModel/ItineraryImportViewModel.swift` | **Already built** -- MVVM pattern |
+| LLM parser service | `Services/LLMParserService.swift` | Exists but uses Gemini -- **DECISION: switch to Travel API or keep Gemini?** |
+| BrandTheme | `BrandTheme.swift` | Exists but uses blue glow -- **needs update to match canonical theme** |
+| Home screen shell | `Features/Home/HomeView.swift` | **Already built** -- basic home view |
+| Color hex extension | `BrandTheme.swift` | **Already built** -- `Color(hex:)` utility |
+
+**QuinnAudio iOS App (Swift -- `WithQuinn/QuinnAudio`)**
+
+| Asset | File | Reuse Strategy |
+|-------|------|----------------|
+| Audio engine recorder | `QuinnAudio/Audio/AudioEngineRecorder.swift` | **Already built** -- AVAudioEngine PCM -> AAC 16kHz, pause/resume, interruption handling |
+| Audio session manager | `QuinnAudio/Audio/AudioSessionManager.swift` | **Already built** -- AVAudioSession config, background recording, Bluetooth, interruption delegate |
+| Audio player | `QuinnAudio/Audio/AudioPlayer.swift` | **Already built** -- playback for recorded audio |
+| Recording engine protocol | `QuinnAudio/Audio/RecordingEngineProtocol.swift` | **Already built** -- abstraction layer for recorder |
+| Battery monitor | `QuinnAudio/Services/BatteryMonitor.swift` | **Already built** -- real-time battery level/state, low-battery warnings at 20% |
+| Low power mode monitor | `QuinnAudio/Services/LowPowerModeMonitor.swift` | **Already built** -- detects Low Power Mode for adaptive behavior |
+| Device capability detection | `QuinnAudio/Utils/DeviceCapability.swift` | **Already built** -- A15-A18 Pro chip detection from device identifier, BGContinuedProcessing support check |
+| Recording store | `QuinnAudio/Services/RecordingStore.swift` | **Already built** -- local storage for audio recordings |
+| Notification manager | `QuinnAudio/Services/NotificationManager.swift` | **Already built** -- local notification handling |
+| Recording model | `QuinnAudio/Models/Recording.swift` | **Already built** -- recording data model |
+| Quinn color palette | `QuinnAudio/Theme/Colors.swift` | Exists but uses light theme -- **needs update to match canonical dark theme** |
+| Typography system | `QuinnAudio/Theme/Typography.swift` | **Already built** -- San Francisco type scale with semantic styles |
+| Log manager | `QuinnAudio/Services/LogManager.swift` | **Already built** -- structured logging |
+
+**Other Repos**
+
+| Asset | Repo | Reuse Strategy |
+|-------|------|----------------|
+| Interactive demo | `.com` (`quinn-demo.jsx`) | Design reference only -- React, not iOS |
+| Design tokens (demo) | `.com` | `#1C1917` stone palette, `#C4B8A8` taupe -- closest to three-journeys mockup |
+| SensoryEngine frontend | `SensoryEngine` (Vite/React) | Web-only, no iOS reuse |
+
+### What Must Be Built (iOS-Native, Genuinely New)
+
+| Component | Stories | Framework | Complexity | Notes |
+|-----------|---------|-----------|------------|-------|
+| CoreLocation geofencing | US-201 | CoreLocation | High | No existing code |
+| PhotoKit time-window queries | US-201 | PhotoKit | Medium | No existing code |
+| Vision photo analysis | US-301 | Vision, CoreML | Medium | No existing code |
+| Speech transcription + NLTagger | US-202 | Speech, NaturalLanguage | Medium | No existing code (QuinnAudio has recording but not transcription) |
+| Background task scheduling | US-201 | BGTaskScheduler | High | QuinnAudio has `DeviceCapability.supportsBGContinuedProcessing` check |
+| SwiftUI screens (new flows) | US-002, US-301, US-302, US-303, US-401, US-501 | SwiftUI | Medium-High | US-001/US-101 import views already exist in Quinn repo |
+| Edit/Override system | US-302 | SwiftUI + SwiftData | Medium | No existing code |
+| Network audit log | US-501 | URLSession interceptor | Medium | No existing code |
+| Processing pipeline visualization | US-501 | SwiftUI | Medium | Strongest trust builder from demo panels -- show "on device" vs "public data" in real-time |
+
+### What Already Exists in iOS Repos (Integrate, Don't Rebuild)
+
+| Component | Source Repo | Stories | Notes |
+|-----------|-----------|---------|-------|
+| Audio recording (AVAudioEngine) | QuinnAudio | US-202 | Full implementation: record, pause, resume, interruptions, background |
+| Audio session management | QuinnAudio | US-202 | Configured for playAndRecord, Bluetooth, speaker routing |
+| Audio playback | QuinnAudio | US-301, US-302 | Voice note player for memory review |
+| Battery monitoring | QuinnAudio | US-201, US-501 | Real-time battery level, low-battery warnings -- addresses Sarah's concern |
+| Low Power Mode detection | QuinnAudio | US-201 | Adaptive behavior when battery-conscious |
+| Device chip detection (Swift) | QuinnAudio | US-201 | A15-A18 Pro mapping, BGContinuedProcessing support |
+| Recording storage | QuinnAudio | US-202 | Local recording persistence |
+| Local notifications | QuinnAudio | US-002 | Notification scheduling |
+| Structured logging | QuinnAudio | All | LogManager with categories |
+| SwiftData ItineraryItem | Quinn | US-101 | Model with title, date, location, attendees, confidence scores |
+| Itinerary import UI + ViewModel | Quinn | US-101 | Full MVVM: import view, review view, view model |
+| Home screen shell | Quinn | US-001 | Basic home view structure |
+| Color hex extension | Quinn | Design System | `Color(hex:)` utility |
+| Typography system | QuinnAudio | Design System | Semantic type scale (title, headline, body, caption) |
 
 ---
 
@@ -150,12 +216,14 @@ Every story must pass:
 | Component | Status | Source | Notes |
 |-----------|--------|--------|-------|
 | Itinerary parsing API | **Reuse** | Travel: `/api/parse-itinerary` | Handles destinations, regions, feelings. |
-| Venue suggestion API | **Reuse** | Travel: `/api/suggest-venues` | Returns 3-5 venue cards with descriptions. SSE streaming. |
+| Venue suggestion API + SSE | **Reuse** | Travel: `/api/suggest-venues` | Returns 3-5 venue cards via Server-Sent Events streaming -- cards appear one-by-one in real-time. |
+| Venue insights cache | **Reuse** | Travel: `lib/insightsCache.ts` | Pre-curated fact/atmosphere/weather/poetic for 30+ popular venues. **Instant load, zero API call.** |
 | Venue card data model | **Reuse** | Travel: `VenueSuggestion` type | Name, description, category, relatedTo. |
 | Prose descriptions | **Reuse** | Travel: Claude prompt | Already generates evocative descriptions. |
-| Mood tags | **New** | -- | Not in current API. Extend Claude prompt. |
-| Best time / Insider tip | **New** | -- | Not in current API. Extend Claude prompt. |
+| Mood tags | **Partial** | Travel: `insightsCache.ts` has "atmosphere" | Extend with mood/feeling tags in prompt. |
+| Best time / Insider tip | **Partial** | Travel: `insightsCache.ts` has "weather" + atmosphere timing | Extend Claude prompt for insider tips. |
 | Hero photos | **Partial** | Travel: Google Places photos | Needs mobile-optimized sizing. |
+| Home screen shell | **Reuse** | Quinn: `HomeView.swift` | **Already built** -- basic home view. |
 | SwiftUI venue card UI | **New** | -- | Match three-journeys mockup. |
 | Particle animation (landing) | **New** | -- | OLED-friendly dark animation. |
 
@@ -327,8 +395,11 @@ Every story must pass:
 | Itinerary parsing | **Reuse** | Travel: `/api/parse-itinerary` | Handles structured, unstructured, and low-fidelity inputs. |
 | Input type classification | **Reuse** | Travel: `has_venues`, `has_intent`, `too_vague` | Auto-detects mode. |
 | Venue extraction | **Reuse** | Travel: Claude prompt | Extracts venues, dates, intent signals. |
-| SwiftData Journey model | **New** | -- | Persist extracted venues as a "Journey" locally. |
-| Home screen entry point | **New** | -- | "Where to next?" card matching mockup. |
+| Iterative refinement | **Reuse** | Travel: `lib/smartRefinement.ts` + `lib/refinementCache.ts` | Claude asks follow-up questions (dates, travelers, purpose). Seed questions for popular destinations = instant first question. User controls when to stop. |
+| SwiftData ItineraryItem model | **Reuse** | Quinn: `ItineraryItem.swift` | **Already built** -- SwiftData @Model with title, date, location, attendees, confidence scores. Extend for Journey grouping. |
+| Import UI + ViewModel | **Reuse** | Quinn: `ItineraryImportView.swift`, `ItineraryImportViewModel.swift` | **Already built** -- MVVM import + review flow. Restyle to match dark theme. |
+| Home screen entry point | **Partial** | Quinn: `HomeView.swift` | Shell exists -- add "Where to next?" card. |
+| LLM parser service | **Decision** | Quinn: `LLMParserService.swift` | Currently uses Gemini API. **DECISION: switch to Travel API (recommended) or keep Gemini?** |
 
 #### Acceptance Criteria
 
@@ -423,6 +494,9 @@ Every story must pass:
 | Geofence trigger schema | **Schema exists** | SE: `detection.trigger = 'dwell'` | Need native CoreLocation. |
 | Photo reference model | **Schema exists** | SE: `PhotoReferenceSchema.local_id` | Typed for PHAsset. Need PhotoKit. |
 | Visit data model | **Schema exists** | SE: `SensoryInputSchema` | Need SwiftData model. |
+| Device chip detection | **Reuse** | QuinnAudio: `DeviceCapability.swift` | **Already built** -- A15-A18 Pro, BGContinuedProcessing check |
+| Battery monitoring | **Reuse** | QuinnAudio: `BatteryMonitor.swift` | **Already built** -- real-time level/state, low-battery warnings |
+| Low Power Mode detection | **Reuse** | QuinnAudio: `LowPowerModeMonitor.swift` | **Already built** -- adaptive behavior when battery-conscious |
 | Arrival/departure logic | **New** | -- | CLCircularRegion, 200m, 3-min dwell filter. |
 | PhotoKit time-window query | **New** | -- | PHAsset date-range queries. |
 | Background location | **New** | -- | UIBackgroundModes: location. |
@@ -496,11 +570,16 @@ Every story must pass:
 |-----------|--------|--------|-------|
 | Audio input schema | **Reuse** | SE: `AudioInputSchema` | duration, transcript, sentiment, keywords |
 | Voice analysis metadata | **Reuse** | SE: `sensoryPrompts.ts` | sentiment, tone, keywords, theme |
+| Audio engine recorder | **Reuse** | QuinnAudio: `AudioEngineRecorder.swift` | **Already built** -- AVAudioEngine PCM -> AAC, pause/resume, interruption handling |
+| Audio session manager | **Reuse** | QuinnAudio: `AudioSessionManager.swift` | **Already built** -- background recording, Bluetooth, speaker routing |
+| Audio playback | **Reuse** | QuinnAudio: `AudioPlayer.swift` | **Already built** -- voice note playback |
+| Recording data model | **Reuse** | QuinnAudio: `Recording.swift` | **Already built** -- needs extension for venue linking |
+| Recording store | **Reuse** | QuinnAudio: `RecordingStore.swift` | **Already built** -- local persistence for recordings |
 | Speech transcription | **New** | -- | `SFSpeechRecognizer` with `.onDevice = true` |
 | Sentiment extraction | **New** | -- | `NLTagger` with `NLTagScheme.sentimentScore` |
 | Keyword extraction | **New** | -- | `NLTagger` noun/verb extraction |
-| Recording UI | **New** | -- | One-tap recording. Linda-simple. |
-| Audio file storage | **New** | -- | Local `.m4a`, encrypted, linked to place or timestamp |
+| Recording UI (Quinn-branded) | **Partial** | QuinnAudio has recording UI | Restyle to match Quinn dark theme. Linda-simple one-tap. |
+| Audio file storage | **Partial** | QuinnAudio: `RecordingStore.swift` | Exists -- add encryption + venue/timestamp linking |
 
 #### Multi-Persona Scenarios
 
@@ -845,6 +924,10 @@ This story directly addresses David's conversion blocker: he went from 7.5/10 (p
 #### Acceptance Criteria
 
 **Functional:**
+- [ ] **Processing Pipeline Visualization** (strongest trust builder from demo panels):
+  - Real-time display showing each processing step: "Analyzing photos... on your device", "Extracting keywords... on your device", "Fetching venue info... public data only"
+  - Clear "on your device" vs "public data" badge per step
+  - This single feature converted Marco (4->7) and was called "the right instinct" by David
 - [ ] **Network Audit Log:** Every outbound network call logged with:
   - Timestamp, destination URL, request type
   - Payload summary (what was sent, in human-readable form)
@@ -904,8 +987,20 @@ This story directly addresses David's conversion blocker: he went from 7.5/10 (p
 - [ ] Export all data: JSON, human-readable
 - [ ] No user accounts in MVP
 
-### Design System (from three-journeys mockup)
+### Design System
 
+**DECISION NEEDED: Canonical theme.** Three repos have divergent design tokens:
+
+| Source | Background | Accent | Typography |
+|--------|-----------|--------|------------|
+| Three-journeys mockup | `#0a0a0a` dark | `#c4b8a8` warm gold | Cormorant Garamond / DM Sans / DM Mono |
+| Quinn iOS (`BrandTheme.swift`) | `#0F0F0F` charcoal | Blue glow | System fonts |
+| QuinnAudio (`Colors.swift`) | `#f8f8f5` light | `#EA580C` orange | San Francisco with semantic scale |
+| .com demo | `#1C1917` stone | `#C4B8A8` taupe | Playfair Display / Inter / DM Mono |
+
+**Recommendation:** Adopt three-journeys mockup as canonical (dark-first, OLED-friendly, warm gold accent). Update Quinn and QuinnAudio `BrandTheme`/`Colors.swift` to match. Reuse QuinnAudio's `Typography.swift` semantic type scale but swap to Cormorant Garamond / DM Sans.
+
+**Canonical tokens (pending decision):**
 - **Background**: `#0a0a0a` (OLED black)
 - **Surface**: `#141414` (cards)
 - **Accent**: `#c4b8a8` (warm gold, sparingly)
@@ -947,17 +1042,17 @@ This story directly addresses David's conversion blocker: he went from 7.5/10 (p
 
 | Story | Primary Persona | User Value | Complexity | Phase | Reuse % |
 |-------|----------------|-----------|------------|-------|---------|
-| US-001 First Encounter | Marco | Very High (acquisition) | Medium | **1** | 70% |
-| US-002 Permissions | Sarah | High (trust) | Low | **1** | 0% |
-| US-101 Start Journey | Sarah | High (utility) | Medium | **1** | 80% |
-| US-102 Review Places | Marco | High (engagement) | Low | **1** | 30% |
-| US-202 Voice Notes | **Linda** | **Very High (PMF 8.5)** | Medium | **2** | 40% |
-| US-201 Arrival Detection | Marco | Very High (core) | **High** | **2** | 20% |
-| US-301 Draft Memory | Linda | Very High (core) | **High** | **2** | 60% |
-| US-302 Memory Card + Edit | **Aisha** | Very High (retention) | Medium | **3** | 50% |
-| US-303 Living Timeline | Sarah | High (engagement) | Low | **3** | 10% |
+| US-001 First Encounter | Marco | Very High (acquisition) | Medium | **1** | 75% (Travel APIs + Quinn HomeView) |
+| US-002 Permissions | Sarah | High (trust) | Low | **1** | 10% (QuinnAudio NotificationManager) |
+| US-101 Start Journey | Sarah | High (utility) | Medium | **1** | **90%** (Travel APIs + Quinn ItineraryItem/Import MVVM) |
+| US-102 Review Places | Marco | High (engagement) | Low | **1** | 30% (design patterns) |
+| US-202 Voice Notes | **Linda** | **Very High (PMF 8.5)** | Medium | **2** | **70%** (QuinnAudio recorder/session/store + SE schema) |
+| US-201 Arrival Detection | Marco | Very High (core) | **High** | **2** | 30% (SE schema + QuinnAudio battery/device) |
+| US-301 Draft Memory | Linda | Very High (core) | **High** | **2** | 60% (SE API + prompts) |
+| US-302 Memory Card + Edit | **Aisha** | Very High (retention) | Medium | **3** | 50% (SE anchors/emotions) |
+| US-303 Living Timeline | Sarah | High (engagement) | Low | **3** | 10% (SwiftData query) |
 | US-401 Sensor Nudges | Sarah | Medium (conversion) | Low | **3** | 0% |
-| US-501 Privacy Dashboard | **David** | High (trust/conversion) | Medium | **3** | 0% |
+| US-501 Privacy Dashboard | **David** | High (trust/conversion) | Medium | **3** | 5% (demo pipeline visualization concept) |
 
 ### Key Priority Changes from v3
 
@@ -1049,6 +1144,10 @@ Vision metadata extraction
 | Phi-3 on-device LLM | **Replaced** by Claude API | Quality is decision gate (panel finding) |
 | Apple Intelligence adapter | **Deferred** | SDK not ready |
 | Invented personas (Yuki, Marcus, Chen Family) | **Replaced** | Business personas validated through 4 rounds of panels |
+| Companion tracking (per-person) | **Deferred** | "Confuses everyone" per v2 panel. SE has CompanionInput schema but messaging unclear. Revisit Phase 4. |
+| Passive conversation capture | **Deferred** | Identified as future differentiator in v2.4 spec review. Privacy implications need resolution. |
+| Profile agent (preference learning) | **Deferred** | Travel repo has profile agent infrastructure. Not needed for MVP. Phase 4. |
+| Gemini LLM parser (Quinn iOS) | **Decision pending** | Quinn repo uses Gemini for parsing. Recommend switching to Travel API for consistency. |
 
 ---
 
@@ -1113,6 +1212,7 @@ Every feature must satisfy:
 
 ## Document History
 
+- **v4.1** (2026-02-23): Cross-repo audit against all 7 Quinn repos. Added QuinnAudio (audio recording, battery monitor, device detection) and Quinn iOS (ItineraryItem model, import MVVM, HomeView) to codebase inventory. Fixed 12 components incorrectly marked "New" that already exist. Added Travel repo features (SSE streaming, iterative refinement, venue insights cache). Added design system decision (3 divergent themes). Added processing pipeline visualization to US-501. Clarified companion tracking as deferred. (Sonnet)
 - **v4.0** (2026-02-23): Rewrite against validated business personas (Sarah, Marco, David, Linda, Aisha). Replaced invented personas. Added caregiving stories (Linda PMF 8.5/10). Added editability (panel #1 gap). Added Privacy Dashboard (David's verification gap). Elevated Voice Notes to Phase 2. Added persona-specific tests to DoD. (Sonnet)
 - **v3.0** (2026-02-23): Integrated Sensory Engine codebase analysis. Added build/reuse inventory. Resolved narrative strategy. (Opus)
 - **v2.0** (2026-02-23): Aligned with three-journeys mockup. Replaced trip-planning with ambient-journaling. (Opus)
