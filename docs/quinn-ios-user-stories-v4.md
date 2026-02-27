@@ -1,7 +1,7 @@
 # Quinn iOS App - User Stories v4
 
-**Version:** 4.3
-**Date:** 2026-02-24
+**Version:** 4.4
+**Date:** 2026-02-27
 **Authors:** Claude Sonnet (v4 rewrite + cross-repo audit), Claude Opus (v2/v3 strategy), Sachin Verma (product)
 **Purpose:** iOS user stories validated against business personas (Sarah, Marco, David, Linda, Aisha), persona panel research, and ALL Quinn repos (sensory-engine, travel, business, Quinn iOS, QuinnAudio, .com, SensoryEngine). Travel is the acquisition hook. Ambient journaling is the platform.
 
@@ -428,7 +428,7 @@ Every story must pass:
 **Also Serves:** Marco (spontaneous travel), Linda (visiting mom's old neighborhood)
 
 **As Sarah (new parent)**
-**We want to** paste our family trip itinerary or just name where we're going
+**I want to** paste my family trip itinerary or just name where we're going
 **So that** Quinn can understand the places we'll visit
 **Without** needing a specific format or worrying about what happens to our data
 
@@ -819,8 +819,8 @@ Every story must pass:
 | Sensory anchors | **Reuse** | SE: `memoryAnchors`, `inferredSensory` | Sound, scent, tactile inferred from context. |
 | Emotion tags | **Reuse** | SE: `emotion_tags[]`, `primaryEmotion` | 7 calibrated types. |
 | Narrative prose | **Reuse** | SE: `narratives.full` | 150-200 words, emotion-matched tone. |
-| Companion experiences | **Reuse** | SE: `companion_experiences[]` | Per-person reactions. |
-| Memory Card UI | **New** | -- | Full-screen hero, sensory anchors, emotion tags, footer. |
+| ~~Companion experiences~~ | **Deferred** | SE: `companion_experiences[]` | Deferred to Phase 4. iOS passes empty `companions: []` until then. |
+| Memory Card UI | **New** | -- | Full-screen hero, "What Quinn Noticed" section, emotion tags, footer. |
 | **Edit/Override system** | **New** | -- | Edit narrative, override emotion tags, add notes. **#1 missing feature from panels.** |
 | Tag search | **New** | -- | SwiftData query by emotion tag across memories. |
 
@@ -833,7 +833,7 @@ Every story must pass:
   - Narrative prose (Quinn's voice, second person)
   - User's quoted words (voice transcript) in italics
   - Quinn's observation ("Five photos, all looking up. Quinn noticed that too.")
-  - **Sensory Anchors:**
+  - **What Quinn Noticed** _(internal: sensory anchors)_:
     - Sound: from SE's `inferredSensory.sound` ("The low percussion of bamboo in wind")
     - Light: from Vision + SE's `sensoryDetails.visual` ("Grey-green, filtered through vertical lines")
     - Time: from duration + relative comparison ("Two hours. The longest pause of your trip.")
@@ -849,7 +849,7 @@ Every story must pass:
 - [ ] All edits saved to SwiftData. Original Quinn version preserved (can "Restore Quinn's version")
 - [ ] **Editorial control test:** Can any user override Quinn's emotion in under 3 taps? Is their word clearly authoritative?
 
-**Sensory Anchors:**
+**What Quinn Noticed** _(internal: sensory anchors)_:
 - [ ] Sound: SE infers from venue + context (Temple -> "chanting", Market -> "vendor calls")
 - [ ] Light: Vision photo analysis + SE synthesis
 - [ ] Time: duration + comparison ("longest pause", "shortest stop")
@@ -868,7 +868,7 @@ Every story must pass:
 - [ ] Long-form scroll, no pagination within a memory
 
 **Testing:**
-- [ ] Unit: Sensory anchor generation from SE response
+- [ ] Unit: "What Quinn Noticed" generation from SE response
 - [ ] Unit: Emotion tag CRUD + override persistence
 - [ ] Unit: Narrative edit save + restore
 - [ ] UI: Edit flow -- change emotion, edit narrative, add note
@@ -1069,7 +1069,7 @@ This story directly addresses David's conversion blocker: he went from 7.5/10 (p
 | Voice notes | Local `.m4a` | `.completeUnlessOpen` | User-controlled | **Never** |
 | Voice metadata | SwiftData | iOS Data Protection | User-controlled | SE API (sentiment, tone, keywords -- not transcript) |
 | Memory narratives | SwiftData | iOS Data Protection | User-controlled | SE API generates, stored locally |
-| Sensory anchors | SwiftData | iOS Data Protection | User-controlled | **Never** |
+| Sensory anchors (internal term; UI label: "What Quinn Noticed") | SwiftData | iOS Data Protection | User-controlled | **Never** |
 | Telemetry | Ephemeral | TLS | Aggregated, no PII | Counts only |
 
 **Privacy Principles:**
@@ -1112,7 +1112,7 @@ This story directly addresses David's conversion blocker: he went from 7.5/10 (p
 ### Accessibility
 
 - [ ] VoiceOver for all screens
-- [ ] Sensory anchors read naturally: "Sound: The low percussion of bamboo in wind"
+- [ ] "What Quinn Noticed" reads naturally: "Sound: The low percussion of bamboo in wind"
 - [ ] Emotion tags announced as list
 - [ ] Photo descriptions from Vision framework = alt text
 - [ ] Dynamic Type: all text scales
@@ -1254,7 +1254,7 @@ Vision metadata extraction
 
 ### User Research (from panels)
 1. **Narrative quality test** -- decision gate. If < 85% of Claude, reconsider architecture.
-2. **Sensory anchor resonance** -- do users connect with evocative prose or does it feel pretentious?
+2. **"What Quinn Noticed" resonance** -- do users connect with evocative prose or does it feel pretentious?
 3. **Permission conversion** -- does value-framed onboarding outperform standard iOS prompts?
 4. **Linda's mom's voice** -- can Speech framework handle elderly speakers with declining articulation?
 5. **Sarah's battery threshold** -- exact % where she uninstalls?
@@ -1304,6 +1304,7 @@ Every feature must satisfy:
 
 ## Document History
 
+- **v4.4** (2026-02-27): Three doc fixes from James's pre-build review: (1) US-101 voice corrected — "We want to" changed to "I want to" for consistency with all other stories; (2) US-302 companion_experiences marked as deferred to Phase 4 — iOS passes empty `companions: []` until then, prevents team from building toward deferred scope; (3) "Sensory Anchors" renamed to "What Quinn Noticed" in all customer-facing contexts — internal engineering term preserved with _(internal: sensory anchors)_ annotation. Linda found technical terms alienating per persona panel. (Opus)
 - **v4.3** (2026-02-24): Six targeted fixes from constraint review: (1) US-302 primary persona reframed from Aisha to Marco — Aisha-specific language removed from acceptance criteria and GTM-bleed note added; (2) US-301 acceptance criterion rewritten — no longer implies SE API as primary path; (3) "What Was Cut" Gemini parser entry resolved (was contradicting codebase inventory); (4) US-101 explicit local-first acceptance criteria added for itinerary parsing; (5) `narrative_generated` telemetry event gains `fallback_reason` property to make cloud fallback rate actionable; (6) Missing telemetry added for US-202 (voice notes), US-401 (sensor nudges), US-501 (privacy dashboard). (Opus)
 - **v4.2** (2026-02-24): Applied three V4 launch constraints from product review: (1) David and Aisha explicitly marked as non-launch-target personas — their stories retained for product completeness but excluded from GTM messaging; (2) Local-first enforced as architectural constraint — narrative generation flipped to on-device LLM primary with SE API as quality-gate fallback only; Phi-3/Llama reinstated, Gemini parser resolved to on-device; Phase 1 "Deploy SE" replaced with narrative quality spike; (3) PostHog iOS SDK specified as global telemetry tool with full event schema and PM/analyst use cases in Cross-Cutting Requirements. (Opus)
 - **v4.1** (2026-02-23): Cross-repo audit against all 7 Quinn repos. Added QuinnAudio (audio recording, battery monitor, device detection) and Quinn iOS (ItineraryItem model, import MVVM, HomeView) to codebase inventory. Fixed 12 components incorrectly marked "New" that already exist. Added Travel repo features (SSE streaming, iterative refinement, venue insights cache). Added design system decision (3 divergent themes). Added processing pipeline visualization to US-501. Clarified companion tracking as deferred. (Sonnet)
