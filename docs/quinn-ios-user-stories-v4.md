@@ -1,7 +1,7 @@
 # Quinn iOS App - User Stories v4
 
-**Version:** 4.4
-**Date:** 2026-02-27
+**Version:** 4.5
+**Date:** 2026-02-28
 **Authors:** Claude Sonnet (v4 rewrite + cross-repo audit), Claude Opus (v2/v3 strategy), Sachin Verma (product)
 **Purpose:** iOS user stories validated against business personas (Sarah, Marco, David, Linda, Aisha), persona panel research, and ALL Quinn repos (sensory-engine, travel, business, Quinn iOS, QuinnAudio, .com, SensoryEngine). Travel is the acquisition hook. Ambient journaling is the platform.
 
@@ -411,6 +411,131 @@ Every story must pass:
 - [ ] UI: "Maybe later" flow -> verify app works without permissions
 - [ ] Privacy: Verify no permission state in telemetry payload
 - [ ] Accessibility: VoiceOver describes each toggle's purpose and state
+
+---
+
+### US-050: Quick Capture (Phase 1 Retention Bridge)
+
+**Primary Persona:** Marco (travel capture), Sarah (baby milestones), Linda (Mom moments)
+**Also Serves:** Aisha (mindfulness journaling)
+
+**As Marco (experience-seeking traveler)**
+**I want to** quickly capture a photo, speak a few words, and jot a note
+**So that** Quinn writes a short narrative about the moment — on my device, instantly
+**Without** waiting for Phase 2 ambient detection to ship
+
+**As Linda (caregiver)**
+**I want to** capture a moment at mom's kitchen with a photo and a voice clip
+**So that** Quinn preserves it as a mini memory while I'm still there
+
+#### Retention Problem This Solves
+
+Phase 1 is entirely travel discovery. A user downloading the app in Week 4 sees venue cards and a "Coming soon" Capture card — nothing to do with it. US-050 fills the Capture card with a working lightweight feature that demonstrates Quinn's personality before the full ambient engine (Phase 2) ships.
+
+#### Build Status
+
+| Component | Status | Source | Notes |
+|-----------|--------|--------|-------|
+| RecordingEngineProtocol | **Reuse** | QuinnAudio | Copied as-is — AVAudioEngine interface abstraction |
+| AudioEngineRecorder | **Simplified** | QuinnAudio | Stripped: pause/resume, background lifecycle, LogManager. Keep: start/stop, PCM→AAC |
+| AudioSessionManager | **Simplified** | QuinnAudio | Stripped: LogManager. Keep: configureForRecording, deactivate |
+| TemplateNarrativeEngine | **New (ported)** | sensoryPrompts.ts `generateFallbackNarrative()` | ~80 template bank — zero ML, zero cloud, <100ms |
+| QuickCapture @Model | **New** | -- | SwiftData model: photo, audio, note, narrativeShort, narrativeMedium |
+| QuickCaptureStore | **New** | -- | File management under Documents/QuickCaptures/, EXIF-stripping, cascade delete |
+| CaptureFlowViewModel | **New** | -- | 4-step orchestration: photo → voice → text → preview |
+| VoiceRecorderViewModel | **New** | -- | 60s max, haptics, auto-stop, permission request |
+| UI Views (6) | **New** | -- | CaptureListView, CaptureFlowView, PhotoCaptureStepView, VoiceClipStepView, TextNoteStepView, NarrativePreviewView |
+| MiniMemoryCardView | **New** | -- | Reusable card component using BrandTheme tokens |
+| HomeView integration | **Updated** | Quinn: HomeView.swift | Capture card: NavigationLink to CaptureListView (was disabled) |
+
+#### Architecture Decisions
+
+- **Template narrative only** — `TemplateNarrativeEngine.swift` ports `generateFallbackNarrative()` from `sensoryPrompts.ts`. No LLM, no cloud, zero latency. This IS the primary path for Phase 1, not a fallback.
+- **NavigationLink, not TabView** — HomeView is a NavigationStack. The Capture card navigates to `CaptureListView`. TabView conversion happens when the full first-run experience (US-001) ships.
+- **Single photo** — One photo per capture. Multi-photo is Phase 2 ambient detection (US-201).
+- **60-second voice clip max** — Quick capture, not full voice notes (US-202 is 10 min).
+- **Captures live on Capture screen only** — No Memories tab integration until Phase 2 when the full Memory model ships.
+- **All files under Documents/QuickCaptures/** — Photos and audio are never transmitted. EXIF stripped from saved photos.
+
+#### User Journey
+
+1. Taps "Capture" on HomeView → `CaptureListView` opens
+2. Empty state: "Catch a moment" + camera icon + "Tap + to start"
+3. Taps "+" → `CaptureFlowView` opens full-screen
+4. **Step 1 — Photo**: Take with camera or pick from library. One required. Preview shown after selection.
+5. **Step 2 — Voice** (optional): Large record button + timer. 60s max. Skip button available.
+6. **Step 3 — Note** (optional): Multi-line text, 500 char max. Thumbnail reminder. Soft prompt if both voice and note skipped.
+7. **Step 4 — Preview**: Quinn's narrative on a MiniMemoryCardView. "Save memory" (primary) or "Edit note" (back to Step 3).
+8. Saved capture appears in `CaptureListView`, newest first.
+
+#### Acceptance Criteria
+
+**Functional:**
+- [ ] Capture card on HomeView navigates to CaptureListView (no longer disabled)
+- [ ] Empty state shows "Catch a moment" with a "+" CTA
+- [ ] "+" opens CaptureFlowView as fullScreenCover
+- [ ] Step 1: Camera (UIImagePickerController) and library (PHPicker) both work. Photo required to advance.
+- [ ] Step 2: Microphone permission requested on first entry. Record/stop by tapping button. 60s auto-stop with haptic. Skip button dismisses without recording.
+- [ ] Step 3: TextEditor with 500 char max. Placeholder text visible when empty. Soft prompt if both voice and note are empty.
+- [ ] Step 4: MiniMemoryCardView rendered with Quinn's narrative. "Save memory" persists to SwiftData. "Edit note" returns to Step 3.
+- [ ] Saved captures appear in CaptureListView, sorted newest-first.
+- [ ] Swipe-to-delete with confirmation dialog.
+- [ ] Delete cascades: removes SwiftData record AND photo/audio files from disk.
+
+**Privacy & Security:**
+- [ ] Zero network requests during entire capture flow (URLSession monitor shows no outbound traffic)
+- [ ] All files written to Documents/QuickCaptures/Photos/ and Documents/QuickCaptures/Audio/ only
+- [ ] EXIF metadata stripped from saved JPEG photos (orientation normalized via UIGraphicsBeginImageContextWithOptions)
+- [ ] QuickCapture SwiftData model not synced to iCloud (local only)
+
+**Narrative Quality (Template Engine):**
+- [ ] Non-empty short and medium outputs for all valid inputs
+- [ ] Contains sensory language for notes mentioning: light, rain, quiet, warm, cold, wind, music, coffee, food, sun, walk, voice, laugh, smell, water
+- [ ] Medium narrative < 200 words
+- [ ] Generation < 100ms (timed assertion in unit tests)
+- [ ] Deterministic: same input always produces same output
+
+**UX & Design:**
+- [ ] All colors use BrandTheme tokens (surface, accent, textPrimary, textSecondary, textMuted, purple, green, borderSubtle)
+- [ ] All typography uses BrandTheme type scale (headline, body, bodyBold, caption, mono)
+- [ ] MiniMemoryCardView: photo (max 200pt height), narrative in Cormorant Garamond (first sentence) / DM Sans (rest), timestamp in DM Mono
+- [ ] Voice clip indicator (purple waveform icon) shown when audio present
+- [ ] Haptic feedback: record start (medium impact), record stop (light impact), save success (notification success)
+- [ ] **Marco test:** Would a UX designer screenshot this card to share? If not, redesign.
+- [ ] **Linda test:** Would a 57-year-old teacher know what to do on each screen within 5 seconds?
+
+**Edge Cases:**
+- [ ] Camera permission denied → Library-only mode (UIImagePickerController falls back to .photoLibrary source type)
+- [ ] Microphone permission denied → "Enable in Settings" banner shown, voice step skippable
+- [ ] Both voice and note skipped → Soft prompt in Step 3, but user can still advance and save
+- [ ] Photo save fails → Error shown, capture not saved
+- [ ] Voice clip < 0.5s → Discarded (too short to be intentional), treated as skip
+- [ ] App backgrounded mid-recording → Recording continues (AVAudioSession configured for playAndRecord)
+
+**Testing:**
+
+*Unit (QuinnTests):*
+- [ ] `QuickCapture` SwiftData model: insert, fetch, delete
+- [ ] `QuickCaptureStore`: photo save (verifies file exists, size > 0), audio URL creation, cascade delete
+- [ ] `TemplateNarrativeEngine`: 10+ input combos — photo+note, photo+voice, morning vs evening, each sensory keyword, empty note, long note
+- [ ] Narrative output: non-empty, < 200 words, generation < 100ms
+- [ ] EXIF stripping: saved JPEG has no EXIF orientation data in raw bytes
+
+*UI (QuinnUITests):*
+- [ ] Full capture flow: card tap → photo → note → preview → save → appears in list
+- [ ] Skip voice clip flow
+- [ ] Empty state renders with CTA
+- [ ] Swipe-to-delete → confirmation → removed from list
+
+*Privacy:*
+- [ ] URLSession monitor confirms zero outbound requests during full capture flow
+- [ ] All written files are under Documents/QuickCaptures/
+
+#### Persona-Specific Tests
+
+**Marco test:** Marco photographs a rain-streaked café window and types "Rain on the window. Espresso cooling." Quinn writes: "Sunday morning. Morning light, still soft. Rain on the window. Espresso cooling. Rain giving the world a different texture. Worth keeping." Marco screenshots it.
+
+**Linda test:** Linda visits her mother and photographs her at the kitchen table. She records a 12-second clip of her mother humming. No text note. Quinn writes: "Saturday afternoon. The afternoon in full brightness. A voice was part of it." Linda can find it, play back the audio, and show it to her sister.
 
 ---
 
@@ -1106,7 +1231,7 @@ This story directly addresses David's conversion blocker: he went from 7.5/10 (p
 ### Navigation (3 tabs)
 
 1. **Discover** (search): Landing, venue cards, discovery
-2. **Capture** (microphone): Voice recording, manual photo add
+2. **Capture** (microphone): Voice recording, manual photo add — **active in Phase 1 via US-050** (NavigationLink from HomeView, not a tab yet — TabView conversion happens with US-001 full first-run)
 3. **Memories** (book): Home, Timeline, Memory Cards
 
 ### Accessibility
@@ -1136,6 +1261,7 @@ This story directly addresses David's conversion blocker: he went from 7.5/10 (p
 |-------|----------------|-----------|------------|-------|---------|
 | US-001 First Encounter | Marco | Very High (acquisition) | Medium | **1** | 75% (Travel APIs + Quinn HomeView) |
 | US-002 Permissions | Sarah | High (trust) | Low | **1** | 10% (QuinnAudio NotificationManager) |
+| **US-050 Quick Capture** | **Marco, Sarah, Linda** | **High (retention bridge)** | Medium | **1** | **55%** (QuinnAudio recorder/session, sensoryPrompts.ts fallback ported to Swift) |
 | US-101 Start Journey | Sarah | High (utility) | Medium | **1** | **90%** (Travel APIs + Quinn ItineraryItem/Import MVVM) |
 | US-102 Review Places | Marco | High (engagement) | Low | **1** | 30% (design patterns) |
 | US-202 Voice Notes | **Linda** | **Very High (PMF 8.5)** | Medium | **2** | **70%** (QuinnAudio recorder/session/store + SE schema) |
@@ -1158,8 +1284,9 @@ This story directly addresses David's conversion blocker: he went from 7.5/10 (p
 **Phase 1 (Weeks 1-4): The Hook**
 1. US-001 First Encounter + US-102 Review Places (core first-run loop)
 2. US-002 Permission Onboarding
-3. US-101 Start Journey (returning user flow)
-4. **Narrative quality spike** (Week 4): test on-device LLM output vs SE Claude — this is the decision gate for Phase 2 narrative strategy. SE deployment to Vercel only if quality spike fails.
+3. **US-050 Quick Capture** (retention bridge — users who arrive in Week 4 have something to do immediately)
+4. US-101 Start Journey (returning user flow)
+5. **Narrative quality spike** (Week 4): test on-device LLM output vs SE Claude — this is the decision gate for Phase 2 narrative strategy. SE deployment to Vercel only if quality spike fails.
 
 **Phase 2 (Weeks 5-10): The Platform**
 5. US-202 Voice Notes (**Linda's PMF -- start early**)
